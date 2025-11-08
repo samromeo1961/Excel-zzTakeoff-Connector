@@ -1,12 +1,18 @@
 /**
  * IPC Handlers for Excel file operations
  * Uses SheetJS (xlsx package) to read and write Excel files
+ *
+ * SECURITY: All file paths are validated before processing to prevent:
+ * - Path traversal attacks
+ * - Access to unauthorized directories
+ * - Processing of oversized files
  */
 
 const path = require('path');
 const { readExcelFile: read, writeExcelFile: write, createRowHash, extractUnits, applyZzTypeMappings, extractColumns, applyColumnMappings } = require('../excel/processor');
 const { getUnitMappings, getCombinedUnitMappings, addDiscoveredUnits, clearDiscoveredUnits, getColumnMappings, addDiscoveredColumns, clearDiscoveredColumns, applySmartMatching } = require('../database/preferences-store');
 const excelDB = require('../database/excel-db');
+const { validateFilePath, validateFileSize } = require('../utils/path-validator');
 
 /**
  * Read an Excel file and return its data
@@ -17,7 +23,17 @@ const excelDB = require('../database/excel-db');
 async function readExcelFile(event, filePath) {
   try {
     console.log('[Excel Handler] Reading file:', filePath);
-    const result = await read(filePath);
+
+    // SECURITY: Validate file path before processing
+    const validatedPath = validateFilePath(filePath, {
+      mustExist: true,
+      checkExtension: true
+    });
+
+    // SECURITY: Check file size before reading
+    validateFileSize(validatedPath, 50); // 50 MB limit
+
+    const result = await read(validatedPath);
     console.log('[Excel Handler] File read successfully:', {
       sheets: result.sheets.length,
       rows: result.sheets[0]?.data.length || 0
@@ -86,7 +102,7 @@ async function readExcelFile(event, filePath) {
 
     // Load data into SQLite for performance
     console.log('[Excel Handler] Loading data into SQLite...');
-    const dbInfo = await excelDB.loadExcelToDatabase(filePath, result.sheets);
+    const dbInfo = await excelDB.loadExcelToDatabase(validatedPath, result.sheets);
     console.log('[Excel Handler] SQLite database ready:', dbInfo.sheets.length, 'sheets');
 
     // Return metadata only (not all data)
@@ -100,14 +116,14 @@ async function readExcelFile(event, filePath) {
 
     return {
       success: true,
-      filePath: filePath,
-      fileName: path.basename(filePath),
+      filePath: validatedPath,
+      fileName: path.basename(validatedPath),
       sheets: sheetsMetadata,
       discoveredUnits: uniqueUnits,
       discoveredColumns: uniqueColumns,
       data: {
-        fileName: path.basename(filePath),
-        filePath: filePath,
+        fileName: path.basename(validatedPath),
+        filePath: validatedPath,
         sheets: sheetsMetadata
       }
     };
@@ -129,7 +145,14 @@ async function writeExcelFile(event, params) {
   try {
     const { filePath, data } = params;
     console.log('[Excel Handler] Writing file:', filePath);
-    await write(filePath, data);
+
+    // SECURITY: Validate file path before writing
+    const validatedPath = validateFilePath(filePath, {
+      mustExist: false, // File may not exist yet (new file)
+      checkExtension: true
+    });
+
+    await write(validatedPath, data);
     console.log('[Excel Handler] File written successfully');
     return { success: true };
   } catch (error) {
@@ -147,7 +170,14 @@ async function writeExcelFile(event, params) {
 async function getMetadata(event, filePath) {
   try {
     console.log('[Excel Handler] Getting metadata from:', filePath);
-    const result = await read(filePath);
+
+    // SECURITY: Validate file path
+    const validatedPath = validateFilePath(filePath, {
+      mustExist: true,
+      checkExtension: true
+    });
+
+    const result = await read(validatedPath);
 
     // Look for hidden metadata sheet
     const metadataSheet = result.sheets.find(sheet => sheet.name === '_zzTakeoffMetadata');
@@ -191,8 +221,14 @@ async function saveMetadata(event, params) {
     const { filePath, metadata } = params;
     console.log('[Excel Handler] Saving metadata to:', filePath);
 
+    // SECURITY: Validate file path
+    const validatedPath = validateFilePath(filePath, {
+      mustExist: true,
+      checkExtension: true
+    });
+
     // Read current file
-    const result = await read(filePath);
+    const result = await read(validatedPath);
 
     // Remove existing metadata sheet if present
     const sheetIndex = result.sheets.findIndex(sheet => sheet.name === '_zzTakeoffMetadata');
@@ -217,7 +253,7 @@ async function saveMetadata(event, params) {
     });
 
     // Write back to file
-    await write(filePath, result);
+    await write(validatedPath, result);
     console.log('[Excel Handler] Metadata saved:', metadataData.length, 'entries');
     return { success: true };
   } catch (error) {
@@ -241,7 +277,13 @@ async function querySheetData(event, params) {
     const { filePath, sheetName, offset = 0, limit = 100 } = params;
     console.log('[Excel Handler] Querying sheet:', sheetName, 'offset:', offset, 'limit:', limit);
 
-    const result = await excelDB.querySheet(filePath, sheetName, { offset, limit });
+    // SECURITY: Validate file path
+    const validatedPath = validateFilePath(filePath, {
+      mustExist: false, // Database file might be in temp directory
+      checkExtension: true
+    });
+
+    const result = await excelDB.querySheet(validatedPath, sheetName, { offset, limit });
 
     console.log('[Excel Handler] Query complete:', result.data.length, 'rows returned');
 
@@ -270,7 +312,13 @@ async function updateSheetRow(event, params) {
     const { filePath, sheetName, rowId, updates } = params;
     console.log('[Excel Handler] Updating row:', rowId, 'in sheet:', sheetName);
 
-    const success = await excelDB.updateRow(filePath, sheetName, rowId, updates);
+    // SECURITY: Validate file path
+    const validatedPath = validateFilePath(filePath, {
+      mustExist: false,
+      checkExtension: true
+    });
+
+    const success = await excelDB.updateRow(validatedPath, sheetName, rowId, updates);
 
     return {
       success,
@@ -290,7 +338,13 @@ async function updateSheetRow(event, params) {
  */
 async function getSheetList(event, filePath) {
   try {
-    const sheets = await excelDB.getSheetList(filePath);
+    // SECURITY: Validate file path
+    const validatedPath = validateFilePath(filePath, {
+      mustExist: false,
+      checkExtension: true
+    });
+
+    const sheets = await excelDB.getSheetList(validatedPath);
     return {
       success: true,
       sheets
@@ -310,7 +364,14 @@ async function getSheetList(event, filePath) {
 async function closeFile(event, filePath) {
   try {
     console.log('[Excel Handler] Closing database for file:', filePath);
-    excelDB.closeDatabase(filePath);
+
+    // SECURITY: Validate file path
+    const validatedPath = validateFilePath(filePath, {
+      mustExist: false,
+      checkExtension: true
+    });
+
+    excelDB.closeDatabase(validatedPath);
     return { success: true };
   } catch (error) {
     console.error('[Excel Handler] Error closing file:', error);
@@ -328,8 +389,14 @@ async function rescanFileForUnits(event, filePath) {
   try {
     console.log('[Excel Handler] Re-scanning file for units:', filePath);
 
+    // SECURITY: Validate file path
+    const validatedPath = validateFilePath(filePath, {
+      mustExist: true,
+      checkExtension: true
+    });
+
     // Read the file again
-    const result = await read(filePath);
+    const result = await read(validatedPath);
 
     // Extract units from FIRST SHEET ONLY
     const allUnits = [];

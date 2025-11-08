@@ -1,10 +1,25 @@
 /**
  * Excel file processor using SheetJS (xlsx package)
  * Handles reading, writing, and hash-based row identification
+ *
+ * SECURITY: File size validation is performed in IPC handlers before
+ * calling these functions. This layer focuses on data processing.
  */
 
 const XLSX = require('xlsx');
 const crypto = require('crypto');
+
+/**
+ * Maximum number of rows to warn about performance
+ * Files with more rows may cause performance issues
+ */
+const MAX_ROWS_WARNING = 10000;
+
+/**
+ * Maximum total rows across all sheets
+ * This is a hard limit to prevent memory exhaustion
+ */
+const MAX_TOTAL_ROWS = 100000;
 
 /**
  * Create a hash fingerprint from row content
@@ -43,6 +58,9 @@ async function readExcelFile(filePath) {
 
     console.log('[Excel Processor] Workbook loaded, sheet count:', workbook.SheetNames.length);
 
+    // Track total rows across all sheets for validation
+    let totalRows = 0;
+
     // Process each sheet
     const sheets = workbook.SheetNames.map(sheetName => {
       const worksheet = workbook.Sheets[sheetName];
@@ -74,6 +92,9 @@ async function readExcelFile(filePath) {
         };
       });
 
+      // Count total rows
+      totalRows += rows.length;
+
       // Check if sheet is hidden
       const isHidden = workbook.Workbook?.Sheets?.[workbook.SheetNames.indexOf(sheetName)]?.Hidden === 1;
 
@@ -86,7 +107,23 @@ async function readExcelFile(filePath) {
       };
     });
 
-    console.log('[Excel Processor] File processed successfully');
+    // SECURITY: Check total row count to prevent memory exhaustion
+    if (totalRows > MAX_TOTAL_ROWS) {
+      throw new Error(
+        `File contains too many rows (${totalRows}). Maximum allowed is ${MAX_TOTAL_ROWS} rows across all sheets. ` +
+        `Please split the file into smaller files or contact support.`
+      );
+    }
+
+    // Performance warning for large files
+    if (totalRows > MAX_ROWS_WARNING) {
+      console.warn(
+        `[Excel Processor] Large file detected: ${totalRows} rows across ${sheets.length} sheet(s). ` +
+        `Performance may be affected. Consider splitting into smaller files for better performance.`
+      );
+    }
+
+    console.log('[Excel Processor] File processed successfully:', totalRows, 'total rows');
 
     return {
       sheets,

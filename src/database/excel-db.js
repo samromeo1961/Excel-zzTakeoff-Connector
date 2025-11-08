@@ -100,28 +100,82 @@ function closeDatabase(excelFilePath) {
 
 /**
  * Sanitize sheet name for use as SQLite table name
- * @param {string} sheetName - Original sheet name
- * @returns {string} Sanitized table name
+ *
+ * SECURITY: This function prevents SQL injection by:
+ * 1. Validating input type and length
+ * 2. Restricting to alphanumeric characters, underscore, and hyphen
+ * 3. Validating the final result matches expected pattern
+ *
+ * @param {string} sheetName - Original sheet name (e.g., "Sales 2024!")
+ * @returns {string} Sanitized table name (e.g., "sheet_Sales_2024_")
+ * @throws {Error} If sheet name is invalid or fails validation
  */
 function sanitizeTableName(sheetName) {
-  // Replace invalid characters with underscore
-  return 'sheet_' + sheetName.replace(/[^a-zA-Z0-9_]/g, '_');
+  // 1. Type and null check
+  if (!sheetName || typeof sheetName !== 'string') {
+    throw new Error('Invalid sheet name: must be a non-empty string');
+  }
+
+  // 2. Length check (prevent excessively long table names)
+  if (sheetName.length > 100) {
+    throw new Error('Sheet name too long (maximum 100 characters)');
+  }
+
+  // 3. Sanitize - only allow alphanumeric, underscore, and hyphen
+  // Add 'sheet_' prefix to avoid SQL reserved keywords
+  const sanitized = 'sheet_' + sheetName.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+  // 4. Validate result matches expected pattern (alphanumeric, underscore, hyphen only)
+  if (!/^sheet_[a-zA-Z0-9_-]+$/.test(sanitized)) {
+    throw new Error('Sanitized table name failed validation');
+  }
+
+  console.log(`[Security] Sanitized table name: "${sheetName}" -> "${sanitized}"`);
+  return sanitized;
 }
 
 /**
  * Sanitize column name for SQLite
+ *
+ * SECURITY: This function prevents SQL injection by:
+ * 1. Validating input type and length
+ * 2. Restricting to alphanumeric characters and underscore only
+ * 3. Ensuring column names don't start with numbers
+ * 4. Validating the final result
+ *
  * @param {string} columnName - Original column name
  * @returns {string} Sanitized column name
+ * @throws {Error} If column name fails validation
  */
 function sanitizeColumnName(columnName) {
+  // 1. Handle empty/null columns
   if (!columnName || columnName.trim() === '') {
     return 'column_empty';
   }
-  // Replace invalid characters and ensure it doesn't start with a number
+
+  // 2. Type check
+  if (typeof columnName !== 'string') {
+    throw new Error('Invalid column name: must be a string');
+  }
+
+  // 3. Length check
+  if (columnName.length > 50) {
+    throw new Error('Column name too long (maximum 50 characters)');
+  }
+
+  // 4. Sanitize - only allow alphanumeric and underscore
   let sanitized = columnName.replace(/[^a-zA-Z0-9_]/g, '_');
+
+  // 5. Ensure doesn't start with a number (invalid SQL identifier)
   if (/^\d/.test(sanitized)) {
     sanitized = 'col_' + sanitized;
   }
+
+  // 6. Validate result matches expected pattern
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(sanitized)) {
+    throw new Error('Sanitized column name failed validation');
+  }
+
   return sanitized;
 }
 
