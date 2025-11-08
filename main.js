@@ -425,6 +425,13 @@ ipcMain.handle('excel:write-file', excelHandlers.writeExcelFile);
 ipcMain.handle('excel:get-metadata', excelHandlers.getMetadata);
 ipcMain.handle('excel:save-metadata', excelHandlers.saveMetadata);
 
+// SQLite-based pagination and sheet operations
+ipcMain.handle('excel:query-sheet', excelHandlers.querySheetData);
+ipcMain.handle('excel:update-row', excelHandlers.updateSheetRow);
+ipcMain.handle('excel:get-sheet-list', excelHandlers.getSheetList);
+ipcMain.handle('excel:close-file', excelHandlers.closeFile);
+ipcMain.handle('excel:rescan-units', excelHandlers.rescanFileForUnits);
+
 // ============================================================
 // IPC Handlers for External APIs (zzTakeoff)
 // ============================================================
@@ -465,6 +472,12 @@ ipcMain.handle('preferences-store:get-unit-mappings', preferencesStoreHandlers.h
 ipcMain.handle('preferences-store:get-discovered-units', preferencesStoreHandlers.handleGetDiscoveredUnits);
 ipcMain.handle('preferences-store:remove-discovered-unit', preferencesStoreHandlers.handleRemoveDiscoveredUnit);
 
+// File-Specific Unit Mappings
+ipcMain.handle('preferences-store:save-file-unit-mappings', preferencesStoreHandlers.handleSaveFileUnitMappings);
+ipcMain.handle('preferences-store:get-file-unit-mappings', preferencesStoreHandlers.handleGetFileUnitMappings);
+ipcMain.handle('preferences-store:get-combined-unit-mappings', preferencesStoreHandlers.handleGetCombinedUnitMappings);
+ipcMain.handle('preferences-store:add-file-unit-mapping', preferencesStoreHandlers.handleAddFileUnitMapping);
+
 // Column Mappings
 ipcMain.handle('preferences-store:get-column-mappings', preferencesStoreHandlers.handleGetColumnMappings);
 ipcMain.handle('preferences-store:save-column-mappings', preferencesStoreHandlers.handleSaveColumnMappings);
@@ -477,6 +490,7 @@ ipcMain.handle('preferences-store:reset-column-mappings', preferencesStoreHandle
 // Discovered Columns
 ipcMain.handle('preferences-store:get-discovered-columns', preferencesStoreHandlers.handleGetDiscoveredColumns);
 ipcMain.handle('preferences-store:remove-discovered-column', preferencesStoreHandlers.handleRemoveDiscoveredColumn);
+ipcMain.handle('preferences-store:clear-discovered-columns', preferencesStoreHandlers.handleClearDiscoveredColumns);
 
 // ============================================================
 // IPC Handlers for Menu

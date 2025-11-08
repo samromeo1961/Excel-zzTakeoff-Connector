@@ -25,6 +25,8 @@ function getDefaultPreferences() {
     lastOpenedFile: null,
     // Unit-to-zzType mappings: [{ unit: string, zzType: string, active: boolean }]
     unitMappings: [],
+    // File-specific unit mappings: { "filepath": [{ unit: string, zzType: string, active: boolean }] }
+    fileUnitMappings: {},
     // Discovered units pending user configuration: [{ unit: string, count: number, lastSeen: timestamp }]
     discoveredUnits: [],
     // Column mappings for Excel Grid display
@@ -45,7 +47,8 @@ function getDefaultPreferences() {
         { id: 'custom5', label: 'Custom 5', excelColumn: null, visible: false, sendToZzTakeoff: false, order: 11, isStandard: false, isMetadata: false },
         // Metadata columns (user-editable values, not mapped from Excel)
         { id: 'markupPercent', label: 'Markup %', excelColumn: null, visible: false, sendToZzTakeoff: true, order: 100, isStandard: true, isMetadata: true },
-        { id: 'zzType', label: 'zzType', excelColumn: null, visible: false, sendToZzTakeoff: true, order: 101, isStandard: true, isMetadata: true }
+        { id: 'zzType', label: 'zzType', excelColumn: null, visible: false, sendToZzTakeoff: true, order: 101, isStandard: true, isMetadata: true },
+        { id: 'costType', label: 'Cost Type', excelColumn: null, visible: false, sendToZzTakeoff: true, order: 102, isStandard: true, isMetadata: true, defaultValue: 'Other' }
       ]
     },
     // Discovered Excel columns pending mapping: [{ columnName: string, count: number, lastSeen: timestamp }]
@@ -216,6 +219,98 @@ function removeDiscoveredUnit(unit) {
 function getDiscoveredUnits() {
   const prefs = getPreferences();
   return prefs.discoveredUnits || [];
+}
+
+/**
+ * Clear all discovered units
+ * Useful when loading a new file to replace old discovered units
+ */
+function clearDiscoveredUnits() {
+  updatePreference('discoveredUnits', []);
+}
+
+/**
+ * Clear all discovered columns
+ * Useful when loading a new file to replace old discovered columns
+ */
+function clearDiscoveredColumns() {
+  updatePreference('discoveredColumns', []);
+}
+
+/**
+ * Save file-specific unit mappings for a file
+ * @param {string} filePath - File path
+ * @param {Array} mappings - Array of unit mappings
+ */
+function saveFileUnitMappings(filePath, mappings) {
+  const prefs = getPreferences();
+  const fileUnitMappings = prefs.fileUnitMappings || {};
+  fileUnitMappings[filePath] = mappings;
+  updatePreference('fileUnitMappings', fileUnitMappings);
+}
+
+/**
+ * Get file-specific unit mappings for a file
+ * @param {string} filePath - File path
+ * @returns {Array} Array of unit mappings for the file
+ */
+function getFileUnitMappings(filePath) {
+  const prefs = getPreferences();
+  const fileUnitMappings = prefs.fileUnitMappings || {};
+  return fileUnitMappings[filePath] || [];
+}
+
+/**
+ * Get combined unit mappings (global + file-specific)
+ * File-specific mappings take precedence over global mappings
+ * @param {string} filePath - File path (optional)
+ * @returns {Array} Combined array of unit mappings
+ */
+function getCombinedUnitMappings(filePath) {
+  const globalMappings = getUnitMappings();
+  if (!filePath) {
+    return globalMappings;
+  }
+
+  const fileMappings = getFileUnitMappings(filePath);
+
+  // Create a map of units from file-specific mappings
+  const fileUnitsMap = new Map(fileMappings.map(m => [m.unit, m]));
+
+  // Combine: file-specific first, then global (excluding duplicates)
+  const combined = [...fileMappings];
+  globalMappings.forEach(mapping => {
+    if (!fileUnitsMap.has(mapping.unit)) {
+      combined.push(mapping);
+    }
+  });
+
+  return combined;
+}
+
+/**
+ * Add or update a single file-specific unit mapping
+ * @param {string} filePath - File path
+ * @param {string} unit - Unit name
+ * @param {string} zzType - zzTakeoff type (area/linear/segment/count)
+ * @param {boolean} active - Whether the mapping is active
+ */
+function addFileUnitMapping(filePath, unit, zzType, active) {
+  const fileMappings = getFileUnitMappings(filePath);
+
+  // Find existing mapping index
+  const existingIndex = fileMappings.findIndex(m => m.unit === unit);
+
+  if (existingIndex >= 0) {
+    // Update existing mapping
+    fileMappings[existingIndex] = { unit, zzType, active };
+  } else {
+    // Add new mapping
+    fileMappings.push({ unit, zzType, active });
+  }
+
+  // Save updated mappings
+  saveFileUnitMappings(filePath, fileMappings);
 }
 
 // ============================================================================
@@ -390,7 +485,7 @@ function smartMatchColumns(excelColumns) {
     sku: ['sku', 'code', 'itemcode', 'item', 'partno', 'partnumber'],
     name: ['name', 'itemname', 'title', 'productname'],
     description: ['description', 'desc', 'details', 'itemdescription'],
-    units: ['units', 'unit', 'uom', 'measure', 'measurement'],
+    units: ['units', 'unit', 'uom', 'um', 'measure', 'measurement', 'unitofmeasure', 'percode', 'percodes', 'per'],
     costCode: ['costcode', 'costcentre', 'costcenter', 'cc', 'scno', 'sc#', 'sc'],
     category: ['category', 'cat', 'type', 'group', 'classification', 'subcategory', 'subcat', 'subcategory'],
     costEach: ['costeach', 'cost', 'unitcost', 'price', 'unitprice', 'rate']
@@ -466,6 +561,11 @@ module.exports = {
   addDiscoveredUnits,
   removeDiscoveredUnit,
   getDiscoveredUnits,
+  clearDiscoveredUnits,
+  saveFileUnitMappings,
+  getFileUnitMappings,
+  getCombinedUnitMappings,
+  addFileUnitMapping,
   // Column mapping functions
   getColumnMappings,
   saveColumnMappings,
@@ -476,6 +576,7 @@ module.exports = {
   addDiscoveredColumns,
   removeDiscoveredColumn,
   getDiscoveredColumns,
+  clearDiscoveredColumns,
   resetColumnMappings,
   smartMatchColumns,
   applySmartMatching

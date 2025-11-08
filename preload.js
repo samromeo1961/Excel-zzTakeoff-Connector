@@ -18,7 +18,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     readFile: (filePath) => ipcRenderer.invoke('excel:read-file', filePath),
     writeFile: (filePath, data) => ipcRenderer.invoke('excel:write-file', { filePath, data }),
     getMetadata: (filePath) => ipcRenderer.invoke('excel:get-metadata', filePath),
-    saveMetadata: (filePath, metadata) => ipcRenderer.invoke('excel:save-metadata', { filePath, metadata })
+    saveMetadata: (filePath, metadata) => ipcRenderer.invoke('excel:save-metadata', { filePath, metadata }),
+    // SQLite-based pagination and sheet operations
+    querySheet: (filePath, sheetName, offset, limit) => ipcRenderer.invoke('excel:query-sheet', { filePath, sheetName, offset, limit }),
+    updateRow: (filePath, sheetName, rowId, updates) => ipcRenderer.invoke('excel:update-row', { filePath, sheetName, rowId, updates }),
+    getSheetList: (filePath) => ipcRenderer.invoke('excel:get-sheet-list', filePath),
+    closeFile: (filePath) => ipcRenderer.invoke('excel:close-file', filePath),
+    rescanUnits: (filePath) => ipcRenderer.invoke('excel:rescan-units', filePath)
   },
 
   // External API calls (for zzTakeoff integration)
@@ -54,6 +60,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Discovered Units
     getDiscoveredUnits: () => ipcRenderer.invoke('preferences-store:get-discovered-units'),
     removeDiscoveredUnit: (unit) => ipcRenderer.invoke('preferences-store:remove-discovered-unit', unit),
+    // File-Specific Unit Mappings
+    saveFileUnitMappings: (filePath, mappings) => ipcRenderer.invoke('preferences-store:save-file-unit-mappings', { filePath, mappings }),
+    getFileUnitMappings: (filePath) => ipcRenderer.invoke('preferences-store:get-file-unit-mappings', filePath),
+    getCombinedUnitMappings: (filePath) => ipcRenderer.invoke('preferences-store:get-combined-unit-mappings', filePath),
+    addFileUnitMapping: (filePath, unit, zzType, active) => ipcRenderer.invoke('preferences-store:add-file-unit-mapping', { filePath, unit, zzType, active }),
     // Column Mappings
     getColumnMappings: () => ipcRenderer.invoke('preferences-store:get-column-mappings'),
     saveColumnMappings: (columnMappings) => ipcRenderer.invoke('preferences-store:save-column-mappings', columnMappings),
@@ -64,7 +75,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     resetColumnMappings: () => ipcRenderer.invoke('preferences-store:reset-column-mappings'),
     // Discovered Columns
     getDiscoveredColumns: () => ipcRenderer.invoke('preferences-store:get-discovered-columns'),
-    removeDiscoveredColumn: (columnName) => ipcRenderer.invoke('preferences-store:remove-discovered-column', columnName)
+    removeDiscoveredColumn: (columnName) => ipcRenderer.invoke('preferences-store:remove-discovered-column', columnName),
+    clearDiscoveredColumns: () => ipcRenderer.invoke('preferences-store:clear-discovered-columns')
   },
 
   // Recents Store (electron-store persistent storage for recent files)

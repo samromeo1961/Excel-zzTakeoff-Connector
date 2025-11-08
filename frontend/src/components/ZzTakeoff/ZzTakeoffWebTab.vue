@@ -206,7 +206,7 @@
 <script setup>
 import { ref, inject, onMounted, onUnmounted, nextTick, watch, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import FullscreenButton from '../Common/FullscreenButton.vue';
+import FullscreenButton from '../common/FullscreenButton.vue';
 import useElectronAPI from '../../composables/useElectronAPI';
 
 const theme = inject('theme');

@@ -24,7 +24,13 @@ export default function useElectronAPI() {
       readFile: (filePath) => window.electronAPI?.excel.readFile(filePath),
       writeFile: (filePath, data) => window.electronAPI?.excel.writeFile(filePath, data),
       getMetadata: (filePath) => window.electronAPI?.excel.getMetadata(filePath),
-      saveMetadata: (filePath, metadata) => window.electronAPI?.excel.saveMetadata(filePath, metadata)
+      saveMetadata: (filePath, metadata) => window.electronAPI?.excel.saveMetadata(filePath, metadata),
+      // SQLite-based pagination and sheet operations
+      querySheet: (filePath, sheetName, offset, limit) => window.electronAPI?.excel.querySheet(filePath, sheetName, offset, limit),
+      updateRow: (filePath, sheetName, rowId, updates) => window.electronAPI?.excel.updateRow(filePath, sheetName, rowId, updates),
+      getSheetList: (filePath) => window.electronAPI?.excel.getSheetList(filePath),
+      closeFile: (filePath) => window.electronAPI?.excel.closeFile(filePath),
+      rescanUnits: (filePath) => window.electronAPI?.excel.rescanUnits(filePath)
     },
     // Database operations
     db: {
@@ -118,6 +124,11 @@ export default function useElectronAPI() {
       // Discovered Units
       getDiscoveredUnits: () => window.electronAPI?.preferencesStore.getDiscoveredUnits(),
       removeDiscoveredUnit: (unit) => window.electronAPI?.preferencesStore.removeDiscoveredUnit(unit),
+      // File-Specific Unit Mappings
+      saveFileUnitMappings: (filePath, mappings) => window.electronAPI?.preferencesStore.saveFileUnitMappings(filePath, mappings),
+      getFileUnitMappings: (filePath) => window.electronAPI?.preferencesStore.getFileUnitMappings(filePath),
+      getCombinedUnitMappings: (filePath) => window.electronAPI?.preferencesStore.getCombinedUnitMappings(filePath),
+      addFileUnitMapping: (filePath, unit, zzType, active) => window.electronAPI?.preferencesStore.addFileUnitMapping(filePath, unit, zzType, active),
       // Column Mappings
       getColumnMappings: () => window.electronAPI?.preferencesStore.getColumnMappings(),
       saveColumnMappings: (columnMappings) => window.electronAPI?.preferencesStore.saveColumnMappings(columnMappings),
@@ -128,7 +139,8 @@ export default function useElectronAPI() {
       resetColumnMappings: () => window.electronAPI?.preferencesStore.resetColumnMappings(),
       // Discovered Columns
       getDiscoveredColumns: () => window.electronAPI?.preferencesStore.getDiscoveredColumns(),
-      removeDiscoveredColumn: (columnName) => window.electronAPI?.preferencesStore.removeDiscoveredColumn(columnName)
+      removeDiscoveredColumn: (columnName) => window.electronAPI?.preferencesStore.removeDiscoveredColumn(columnName),
+      clearDiscoveredColumns: () => window.electronAPI?.preferencesStore.clearDiscoveredColumns()
     },
 
     // Templates (database operations)

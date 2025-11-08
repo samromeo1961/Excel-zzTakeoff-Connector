@@ -83,8 +83,8 @@
 <script setup>
 import { ref, inject, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import FullscreenButton from '../Common/FullscreenButton.vue';
-import FullscreenNavigation from '../Common/FullscreenNavigation.vue';
+import FullscreenButton from '../common/FullscreenButton.vue';
+import FullscreenNavigation from '../common/FullscreenNavigation.vue';
 import useElectronAPI from '../../composables/useElectronAPI';
 
 const api = useElectronAPI();

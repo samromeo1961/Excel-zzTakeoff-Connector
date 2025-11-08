@@ -216,11 +216,12 @@
                 </span>
               </button>
               <button
-                @click="loadDiscoveredUnits"
-                class="btn btn-outline-secondary"
-                title="Refresh count"
+                @click="refreshDiscoveredUnits"
+                class="btn btn-outline-success"
+                title="Re-scan current file for units"
               >
-                <i class="bi bi-arrow-clockwise"></i>
+                <i class="bi bi-arrow-clockwise me-1"></i>
+                Refresh
               </button>
             </div>
 
@@ -413,6 +414,22 @@
       </div>
 
     </div>
+
+    <!-- Save Preferences Button (at bottom) -->
+    <div class="mt-4 p-3 border-top">
+      <div class="d-flex justify-content-between align-items-center">
+        <p class="text-muted small mb-0">
+          Click "Apply & Reload Grid" to save all preferences and reload the Excel Grid with updated column mappings.
+        </p>
+        <button
+          @click="saveAndReloadGrid"
+          class="btn btn-primary btn-lg"
+        >
+          <i class="bi bi-save me-2"></i>
+          Apply & Reload Grid
+        </button>
+      </div>
+    </div>
     </div>
   </div>
 
@@ -470,8 +487,8 @@
 <script setup>
 import { inject, ref, onMounted, onActivated, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import FullscreenButton from '../Common/FullscreenButton.vue';
-import FullscreenNavigation from '../Common/FullscreenNavigation.vue';
+import FullscreenButton from '../common/FullscreenButton.vue';
+import FullscreenNavigation from '../common/FullscreenNavigation.vue';
 import DiscoveredUnitsModal from '../Modals/DiscoveredUnitsModal.vue';
 import useElectronAPI from '../../composables/useElectronAPI';
 
@@ -479,6 +496,7 @@ const api = useElectronAPI();
 const router = useRouter();
 const theme = inject('theme');
 const isFullscreen = inject('isFullscreen');
+const sharedState = inject('excelFileState'); // Access shared file state
 
 // Accordion state
 const expandedSections = ref({
@@ -634,6 +652,39 @@ const handleDiscoveredUnitsUpdated = async () => {
 // Refresh functions
 const refreshUnitMappings = async () => {
   await loadUnitMappings();
+};
+
+// Refresh discovered units by re-scanning current file
+const refreshDiscoveredUnits = async () => {
+  try {
+    // Get the currently open file from shared state
+    const currentFile = sharedState?.value?.currentFile;
+
+    console.log('[Preferences] Current file from shared state:', currentFile);
+
+    if (!currentFile) {
+      alert('No file is currently open. Please open an Excel file first.');
+      return;
+    }
+
+    // Re-scan the file for units
+    console.log('[Preferences] Re-scanning file for units:', currentFile);
+    const result = await api.excel.rescanUnits(currentFile);
+
+    if (result.success) {
+      console.log('[Preferences] Re-scan complete. Units discovered:', result.discoveredUnits?.length || 0);
+
+      // Reload discovered units list to reflect changes
+      await loadDiscoveredUnits();
+
+      alert(`Refresh complete! Found ${result.discoveredUnits?.length || 0} unique units in the first sheet.`);
+    } else {
+      alert(`Failed to refresh units: ${result.message}`);
+    }
+  } catch (error) {
+    console.error('Failed to refresh discovered units:', error);
+    alert(`Error refreshing units: ${error.message}`);
+  }
 };
 
 // ============================================================================
@@ -796,6 +847,48 @@ const resetColumnMappings = async () => {
     await loadDiscoveredColumns();
   } catch (error) {
     console.error('Failed to reset column mappings:', error);
+  }
+};
+
+// Save preferences and reload grid
+const saveAndReloadGrid = async () => {
+  try {
+    console.log('[Preferences] Saving all preferences and reloading grid...');
+
+    // Get current file from shared state
+    const currentFile = sharedState?.value?.currentFile;
+
+    if (!currentFile) {
+      alert('No file is currently open. Please open an Excel file first.');
+      return;
+    }
+
+    // Reset column mappings to defaults to force re-scan with new smart matching rules
+    console.log('[Preferences] Resetting column mappings to force re-scan...');
+    await api.preferencesStore.resetColumnMappings();
+
+    // Clear discovered columns to allow fresh discovery
+    await api.preferencesStore.clearDiscoveredColumns();
+
+    // Reload column mappings
+    await loadColumnMappings();
+    await loadDiscoveredColumns();
+
+    // Navigate to Excel Grid tab
+    await router.push('/excel');
+
+    // Wait for navigation to complete
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Dispatch event to force grid reload with re-scan
+    window.dispatchEvent(new CustomEvent('force-grid-reload', {
+      detail: { rescan: true }
+    }));
+
+    alert('Preferences applied! Column mappings have been reset and the grid will reload with updated smart matching.');
+  } catch (error) {
+    console.error('[Preferences] Error saving and reloading:', error);
+    alert(`Error: ${error.message}`);
   }
 };
 

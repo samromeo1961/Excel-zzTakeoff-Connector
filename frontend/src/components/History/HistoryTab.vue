@@ -84,7 +84,7 @@
 import { ref, computed, inject, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { AgGridVue } from 'ag-grid-vue3';
-import TabToolbar from '../Common/TabToolbar.vue';
+import TabToolbar from '../common/TabToolbar.vue';
 import useElectronAPI from '../../composables/useElectronAPI';
 
 const api = useElectronAPI();

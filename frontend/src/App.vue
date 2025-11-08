@@ -117,7 +117,7 @@
 import { ref, provide, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import useElectronAPI from './composables/useElectronAPI';
-import HelpModal from './components/Common/HelpModal.vue';
+import HelpModal from './components/common/HelpModal.vue';
 
 const router = useRouter();
 const route = useRoute();

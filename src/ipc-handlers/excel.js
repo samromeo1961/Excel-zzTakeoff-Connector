@@ -3,8 +3,10 @@
  * Uses SheetJS (xlsx package) to read and write Excel files
  */
 
+const path = require('path');
 const { readExcelFile: read, writeExcelFile: write, createRowHash, extractUnits, applyZzTypeMappings, extractColumns, applyColumnMappings } = require('../excel/processor');
-const { getUnitMappings, addDiscoveredUnits, getColumnMappings, addDiscoveredColumns, applySmartMatching } = require('../database/preferences-store');
+const { getUnitMappings, getCombinedUnitMappings, addDiscoveredUnits, clearDiscoveredUnits, getColumnMappings, addDiscoveredColumns, clearDiscoveredColumns, applySmartMatching } = require('../database/preferences-store');
+const excelDB = require('../database/excel-db');
 
 /**
  * Read an Excel file and return its data
@@ -21,25 +23,36 @@ async function readExcelFile(event, filePath) {
       rows: result.sheets[0]?.data.length || 0
     });
 
-    // Extract units from all sheets
+    // Extract units from FIRST SHEET ONLY
     const allUnits = [];
-    result.sheets.forEach(sheet => {
-      if (!sheet.hidden && sheet.data && sheet.data.length > 0) {
-        const units = extractUnits(sheet.data);
-        allUnits.push(...units);
-      }
-    });
+    const firstSheet = result.sheets.find(sheet => !sheet.hidden);
+
+    // Get column mappings to find the correct unit column
+    const columnMappingsData = getColumnMappings();
+
+    if (firstSheet && firstSheet.data && firstSheet.data.length > 0) {
+      const units = extractUnits(firstSheet.data, columnMappingsData);
+      allUnits.push(...units);
+    }
 
     // Get unique units
     const uniqueUnits = [...new Set(allUnits)];
 
-    // Add discovered units to preferences
+    // Get combined unit mappings (file-specific + global)
+    const unitMappings = getCombinedUnitMappings(filePath);
+
+    // Clear previous discovered units and add new ones from current file
+    // Only add units that don't have mappings (either global or file-specific)
+    clearDiscoveredUnits();
     if (uniqueUnits.length > 0) {
-      addDiscoveredUnits(uniqueUnits);
+      const mappedUnits = new Set(unitMappings.map(m => m.unit));
+      const unmappedUnits = uniqueUnits.filter(unit => !mappedUnits.has(unit));
+      if (unmappedUnits.length > 0) {
+        addDiscoveredUnits(unmappedUnits);
+      }
     }
 
-    // Get unit mappings and apply them
-    const unitMappings = getUnitMappings();
+    // Apply unit mappings to data
     if (unitMappings.length > 0) {
       result.sheets = result.sheets.map(sheet => {
         if (!sheet.hidden && sheet.data && sheet.data.length > 0) {
@@ -49,19 +62,18 @@ async function readExcelFile(event, filePath) {
       });
     }
 
-    // Extract columns from all sheets
+    // Extract columns from FIRST SHEET ONLY (reuse firstSheet from above)
     const allColumns = [];
-    result.sheets.forEach(sheet => {
-      if (!sheet.hidden && sheet.data && sheet.data.length > 0) {
-        const columns = extractColumns(sheet.data);
-        allColumns.push(...columns);
-      }
-    });
+    if (firstSheet && firstSheet.data && firstSheet.data.length > 0) {
+      const columns = extractColumns(firstSheet.data);
+      allColumns.push(...columns);
+    }
 
     // Get unique columns
     const uniqueColumns = [...new Set(allColumns)];
 
-    // Add discovered columns to preferences
+    // Clear previous discovered columns and add new ones from current file
+    clearDiscoveredColumns();
     if (uniqueColumns.length > 0) {
       addDiscoveredColumns(uniqueColumns);
 
@@ -72,11 +84,32 @@ async function readExcelFile(event, filePath) {
     console.log('[Excel Handler] Units discovered:', uniqueUnits.length);
     console.log('[Excel Handler] Columns discovered:', uniqueColumns.length);
 
+    // Load data into SQLite for performance
+    console.log('[Excel Handler] Loading data into SQLite...');
+    const dbInfo = await excelDB.loadExcelToDatabase(filePath, result.sheets);
+    console.log('[Excel Handler] SQLite database ready:', dbInfo.sheets.length, 'sheets');
+
+    // Return metadata only (not all data)
+    const sheetsMetadata = dbInfo.sheets.map(s => ({
+      name: s.name,
+      tableName: s.tableName,
+      rowCount: s.rowCount,
+      columns: s.columns,
+      sanitizedColumns: s.sanitizedColumns
+    }));
+
     return {
       success: true,
-      data: result,
+      filePath: filePath,
+      fileName: path.basename(filePath),
+      sheets: sheetsMetadata,
       discoveredUnits: uniqueUnits,
-      discoveredColumns: uniqueColumns
+      discoveredColumns: uniqueColumns,
+      data: {
+        fileName: path.basename(filePath),
+        filePath: filePath,
+        sheets: sheetsMetadata
+      }
     };
   } catch (error) {
     console.error('[Excel Handler] Error reading file:', error);
@@ -193,9 +226,159 @@ async function saveMetadata(event, params) {
   }
 }
 
+/**
+ * Query sheet data with pagination
+ * @param {Event} event - IPC event
+ * @param {Object} params - Query parameters
+ * @param {string} params.filePath - Path to Excel file
+ * @param {string} params.sheetName - Name of the sheet
+ * @param {number} params.offset - Offset for pagination
+ * @param {number} params.limit - Limit for pagination
+ * @returns {Promise<{success: boolean, data?: any, message?: string}>}
+ */
+async function querySheetData(event, params) {
+  try {
+    const { filePath, sheetName, offset = 0, limit = 100 } = params;
+    console.log('[Excel Handler] Querying sheet:', sheetName, 'offset:', offset, 'limit:', limit);
+
+    const result = await excelDB.querySheet(filePath, sheetName, { offset, limit });
+
+    console.log('[Excel Handler] Query complete:', result.data.length, 'rows returned');
+
+    return {
+      success: true,
+      ...result
+    };
+  } catch (error) {
+    console.error('[Excel Handler] Error querying sheet:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Update a row in the sheet
+ * @param {Event} event - IPC event
+ * @param {Object} params - Update parameters
+ * @param {string} params.filePath - Path to Excel file
+ * @param {string} params.sheetName - Name of the sheet
+ * @param {number} params.rowId - Row ID
+ * @param {Object} params.updates - Column-value pairs to update
+ * @returns {Promise<{success: boolean, message?: string}>}
+ */
+async function updateSheetRow(event, params) {
+  try {
+    const { filePath, sheetName, rowId, updates } = params;
+    console.log('[Excel Handler] Updating row:', rowId, 'in sheet:', sheetName);
+
+    const success = await excelDB.updateRow(filePath, sheetName, rowId, updates);
+
+    return {
+      success,
+      message: success ? 'Row updated successfully' : 'Row not found'
+    };
+  } catch (error) {
+    console.error('[Excel Handler] Error updating row:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Get list of all sheets
+ * @param {Event} event - IPC event
+ * @param {string} filePath - Path to Excel file
+ * @returns {Promise<{success: boolean, sheets?: any, message?: string}>}
+ */
+async function getSheetList(event, filePath) {
+  try {
+    const sheets = await excelDB.getSheetList(filePath);
+    return {
+      success: true,
+      sheets
+    };
+  } catch (error) {
+    console.error('[Excel Handler] Error getting sheet list:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Close database for a file
+ * @param {Event} event - IPC event
+ * @param {string} filePath - Path to Excel file
+ * @returns {Promise<{success: boolean}>}
+ */
+async function closeFile(event, filePath) {
+  try {
+    console.log('[Excel Handler] Closing database for file:', filePath);
+    excelDB.closeDatabase(filePath);
+    return { success: true };
+  } catch (error) {
+    console.error('[Excel Handler] Error closing file:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Re-scan file for discovered units (clears old and adds new from current file)
+ * @param {Event} event - IPC event
+ * @param {string} filePath - Path to Excel file
+ * @returns {Promise<{success: boolean, discoveredUnits?: any, message?: string}>}
+ */
+async function rescanFileForUnits(event, filePath) {
+  try {
+    console.log('[Excel Handler] Re-scanning file for units:', filePath);
+
+    // Read the file again
+    const result = await read(filePath);
+
+    // Extract units from FIRST SHEET ONLY
+    const allUnits = [];
+    const firstSheet = result.sheets.find(sheet => !sheet.hidden);
+
+    // Get column mappings to find the correct unit column
+    const columnMappingsData = getColumnMappings();
+
+    if (firstSheet && firstSheet.data && firstSheet.data.length > 0) {
+      const units = extractUnits(firstSheet.data, columnMappingsData);
+      allUnits.push(...units);
+    }
+
+    // Get unique units
+    const uniqueUnits = [...new Set(allUnits)];
+
+    // Get combined unit mappings (file-specific + global)
+    const unitMappings = getCombinedUnitMappings(filePath);
+
+    // Clear previous discovered units and add new ones from current file
+    clearDiscoveredUnits();
+    if (uniqueUnits.length > 0) {
+      const mappedUnits = new Set(unitMappings.map(m => m.unit));
+      const unmappedUnits = uniqueUnits.filter(unit => !mappedUnits.has(unit));
+      if (unmappedUnits.length > 0) {
+        addDiscoveredUnits(unmappedUnits);
+      }
+    }
+
+    console.log('[Excel Handler] Re-scan complete. Units discovered:', uniqueUnits.length);
+
+    return {
+      success: true,
+      discoveredUnits: uniqueUnits
+    };
+  } catch (error) {
+    console.error('[Excel Handler] Error re-scanning file for units:', error);
+    return { success: false, message: error.message };
+  }
+}
+
 module.exports = {
   readExcelFile,
   writeExcelFile,
   getMetadata,
-  saveMetadata
+  saveMetadata,
+  querySheetData,
+  updateSheetRow,
+  getSheetList,
+  closeFile,
+  rescanFileForUnits
 };

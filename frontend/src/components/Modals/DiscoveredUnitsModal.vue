@@ -114,13 +114,27 @@ const emit = defineEmits(['close', 'updated']);
 
 const api = useElectronAPI();
 const discoveredUnits = ref([]);
+const currentFilePath = ref(null);
 
-// Load discovered units when modal opens
+// Load discovered units and current file path when modal opens
 watch(() => props.isOpen, async (newVal) => {
   if (newVal) {
+    await loadCurrentFilePath();
     await loadDiscoveredUnits();
   }
 });
+
+// Load current file path from preferences
+const loadCurrentFilePath = async () => {
+  try {
+    const prefsResult = await api.preferencesStore.get();
+    if (prefsResult.success) {
+      currentFilePath.value = prefsResult.data.lastOpenedFile || null;
+    }
+  } catch (error) {
+    console.error('Failed to load current file path:', error);
+  }
+};
 
 // Load discovered units
 const loadDiscoveredUnits = async () => {
@@ -142,7 +156,12 @@ const acceptUnit = async (unit, zzType, index) => {
   if (!zzType) return;
 
   try {
-    await api.preferencesStore.saveUnitMapping(unit, zzType, true);
+    // Save as file-specific mapping if we have a file path, otherwise save as global
+    if (currentFilePath.value) {
+      await api.preferencesStore.addFileUnitMapping(currentFilePath.value, unit, zzType, true);
+    } else {
+      await api.preferencesStore.saveUnitMapping(unit, zzType, true);
+    }
     await api.preferencesStore.removeDiscoveredUnit(unit);
 
     // Remove from local array
@@ -172,7 +191,12 @@ const rejectUnit = async (unit, index) => {
 const acceptAllWithDefaults = async () => {
   try {
     for (const discovered of discoveredUnits.value) {
-      await api.preferencesStore.saveUnitMapping(discovered.unit, 'count', true);
+      // Save as file-specific mapping if we have a file path, otherwise save as global
+      if (currentFilePath.value) {
+        await api.preferencesStore.addFileUnitMapping(currentFilePath.value, discovered.unit, 'count', true);
+      } else {
+        await api.preferencesStore.saveUnitMapping(discovered.unit, 'count', true);
+      }
       await api.preferencesStore.removeDiscoveredUnit(discovered.unit);
     }
 

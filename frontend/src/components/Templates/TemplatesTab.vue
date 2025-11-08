@@ -299,7 +299,7 @@
 <script setup>
 import { ref, computed, onMounted, inject } from 'vue';
 import { AgGridVue } from 'ag-grid-vue3';
-import TabToolbar from '../Common/TabToolbar.vue';
+import TabToolbar from '../common/TabToolbar.vue';
 import UpdateTemplateModal from '../Modals/UpdateTemplateModal.vue';
 import useElectronAPI from '../../composables/useElectronAPI';
 import { useRouter } from 'vue-router';
@@ -522,6 +522,7 @@ const columnDefs = computed(() => {
         headerName: prefCol.label,
         editable: true,
         singleClickEdit: true,
+        cellEditor: isCostEach ? undefined : 'agTextCellEditor', // Force text editor for non-numeric columns (SKU can be alphanumeric)
         minWidth: isDescriptionColumn ? 455 : 100, // 30% wider (350 * 1.3 = 455)
         flex: isDescriptionColumn ? 3 : 1,
         suppressMovable: false,

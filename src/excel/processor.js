@@ -157,18 +157,38 @@ async function writeExcelFile(filePath, data) {
 /**
  * Extract unique units from Excel data
  * @param {Array<Object>} data - Array of row objects
+ * @param {Object} columnMappings - Optional column mappings object
  * @returns {Array<string>} - Array of unique unit names
  */
-function extractUnits(data) {
+function extractUnits(data, columnMappings = null) {
   if (!Array.isArray(data) || data.length === 0) {
     return [];
   }
 
   const units = new Set();
 
+  // Try to get the mapped Excel column for 'units' from column mappings
+  let mappedUnitColumn = null;
+  if (columnMappings && columnMappings.preferredColumns) {
+    const unitsMapping = columnMappings.preferredColumns.find(col => col.id === 'units');
+    if (unitsMapping && unitsMapping.excelColumn) {
+      mappedUnitColumn = unitsMapping.excelColumn;
+    }
+  }
+
   data.forEach(row => {
-    // Try various column names for units
-    const unit = row.unit || row.Unit || row.UNIT || row.Units || row.units || row.UOM || row.uom;
+    let unit = null;
+
+    // First, try the mapped column if available
+    if (mappedUnitColumn && row[mappedUnitColumn]) {
+      unit = row[mappedUnitColumn];
+    } else {
+      // Fall back to trying various common column names for units
+      unit = row.unit || row.Unit || row.UNIT || row.Units || row.units ||
+             row.UOM || row.uom || row.UM || row.um ||
+             row.PerCode || row.percode || row.Percode || row.PERCODE ||
+             row.PerCodes || row.percodes || row.Percodes || row.PERCODES;
+    }
 
     if (unit && typeof unit === 'string' && unit.trim()) {
       units.add(unit.trim());

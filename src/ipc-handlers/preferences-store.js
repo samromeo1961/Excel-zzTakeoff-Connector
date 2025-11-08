@@ -19,7 +19,12 @@ const {
   addDiscoveredColumns,
   removeDiscoveredColumn,
   getDiscoveredColumns,
-  resetColumnMappings
+  clearDiscoveredColumns,
+  resetColumnMappings,
+  saveFileUnitMappings,
+  getFileUnitMappings,
+  getCombinedUnitMappings,
+  addFileUnitMapping
 } = require('../database/preferences-store');
 
 /**
@@ -214,6 +219,90 @@ async function handleRemoveDiscoveredUnit(event, unit) {
 }
 
 // ============================================================================
+// File-Specific Unit Mapping Handlers
+// ============================================================================
+
+/**
+ * Save file-specific unit mappings
+ * IPC Handler: 'preferences-store:save-file-unit-mappings'
+ */
+async function handleSaveFileUnitMappings(event, { filePath, mappings }) {
+  try {
+    saveFileUnitMappings(filePath, mappings);
+    return { success: true };
+  } catch (err) {
+    console.error('Error saving file-specific unit mappings:', err);
+    return {
+      success: false,
+      error: 'Failed to save file-specific unit mappings',
+      message: err.message
+    };
+  }
+}
+
+/**
+ * Get file-specific unit mappings
+ * IPC Handler: 'preferences-store:get-file-unit-mappings'
+ */
+async function handleGetFileUnitMappings(event, filePath) {
+  try {
+    const mappings = getFileUnitMappings(filePath);
+    return {
+      success: true,
+      data: mappings
+    };
+  } catch (err) {
+    console.error('Error getting file-specific unit mappings:', err);
+    return {
+      success: false,
+      error: 'Failed to get file-specific unit mappings',
+      message: err.message,
+      data: []
+    };
+  }
+}
+
+/**
+ * Get combined unit mappings (file-specific + global)
+ * IPC Handler: 'preferences-store:get-combined-unit-mappings'
+ */
+async function handleGetCombinedUnitMappings(event, filePath) {
+  try {
+    const mappings = getCombinedUnitMappings(filePath);
+    return {
+      success: true,
+      data: mappings
+    };
+  } catch (err) {
+    console.error('Error getting combined unit mappings:', err);
+    return {
+      success: false,
+      error: 'Failed to get combined unit mappings',
+      message: err.message,
+      data: []
+    };
+  }
+}
+
+/**
+ * Add a single file-specific unit mapping
+ * IPC Handler: 'preferences-store:add-file-unit-mapping'
+ */
+async function handleAddFileUnitMapping(event, { filePath, unit, zzType, active }) {
+  try {
+    addFileUnitMapping(filePath, unit, zzType, active);
+    return { success: true };
+  } catch (err) {
+    console.error('Error adding file-specific unit mapping:', err);
+    return {
+      success: false,
+      error: 'Failed to add file-specific unit mapping',
+      message: err.message
+    };
+  }
+}
+
+// ============================================================================
 // Column Mapping Handlers
 // ============================================================================
 
@@ -390,6 +479,24 @@ async function handleResetColumnMappings(event, params) {
   }
 }
 
+/**
+ * Clear all discovered columns
+ * IPC Handler: 'preferences-store:clear-discovered-columns'
+ */
+async function handleClearDiscoveredColumns(event, params) {
+  try {
+    clearDiscoveredColumns();
+    return { success: true };
+  } catch (err) {
+    console.error('Error clearing discovered columns:', err);
+    return {
+      success: false,
+      error: 'Failed to clear discovered columns',
+      message: err.message
+    };
+  }
+}
+
 module.exports = {
   handleGetPreferences,
   handleSavePreferences,
@@ -401,6 +508,11 @@ module.exports = {
   handleGetUnitMappings,
   handleGetDiscoveredUnits,
   handleRemoveDiscoveredUnit,
+  // File-specific unit mapping handlers
+  handleSaveFileUnitMappings,
+  handleGetFileUnitMappings,
+  handleGetCombinedUnitMappings,
+  handleAddFileUnitMapping,
   // Column mapping handlers
   handleGetColumnMappings,
   handleSaveColumnMappings,
@@ -410,5 +522,6 @@ module.exports = {
   handleReorderColumns,
   handleGetDiscoveredColumns,
   handleRemoveDiscoveredColumn,
+  handleClearDiscoveredColumns,
   handleResetColumnMappings
 };

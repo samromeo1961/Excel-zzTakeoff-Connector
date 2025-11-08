@@ -134,6 +134,21 @@
 
     <!-- AG Grid -->
     <div v-else class="flex-grow-1 position-relative">
+      <!-- Sheet selector for multi-sheet files -->
+      <div v-if="availableSheets.length > 1" class="p-2 bg-light border-bottom">
+        <label class="form-label mb-1 small">Sheet:</label>
+        <select
+          v-model="currentSheetName"
+          @change="onSheetChange"
+          class="form-select form-select-sm"
+          style="max-width: 300px;"
+        >
+          <option v-for="sheet in availableSheets" :key="sheet.name" :value="sheet.name">
+            {{ sheet.name }} ({{ sheet.rowCount }} rows)
+          </option>
+        </select>
+      </div>
+
       <ag-grid-vue
         class="h-100"
         :class="theme === 'dark' ? 'ag-theme-quartz-dark' : 'ag-theme-quartz'"
@@ -141,8 +156,8 @@
         :rowData="rowData"
         :defaultColDef="defaultColDef"
         :pagination="true"
-        :paginationPageSize="50"
-        :paginationPageSizeSelector="[20, 50, 100, 200]"
+        :paginationPageSize="100"
+        :paginationPageSizeSelector="[50, 100, 200, 500]"
         :suppressCellFocus="false"
         :enableCellTextSelection="true"
         :enableBrowserTooltips="true"
@@ -181,7 +196,7 @@ import { useRouter } from 'vue-router';
 import { AgGridVue } from 'ag-grid-vue3';
 import SendToTemplateModal from '../Modals/SendToTemplateModal.vue';
 import UpdateTemplateModal from '../Modals/UpdateTemplateModal.vue';
-import TabToolbar from '../Common/TabToolbar.vue';
+import TabToolbar from '../common/TabToolbar.vue';
 import useElectronAPI from '../../composables/useElectronAPI';
 
 const api = useElectronAPI();
@@ -217,6 +232,70 @@ const metadata = ref({});
 const gridApi = ref(null);
 const loading = ref(false);
 const loadingMessage = ref('');
+
+// SQLite pagination state
+const availableSheets = ref([]);
+const currentSheetName = ref('');
+const totalRowCount = ref(0);
+
+// Load all rows from SQLite for the current sheet
+const loadSheetData = async () => {
+  if (!currentFile.value || !currentSheetName.value) {
+    rowData.value = [];
+    return;
+  }
+
+  try {
+    loading.value = true;
+    loadingMessage.value = 'Loading sheet data...';
+
+    // Get default markup from preferences
+    let defaultMarkupPercent = null;
+    if (api.preferencesStore?.get) {
+      const prefsResult = await api.preferencesStore.get();
+      defaultMarkupPercent = prefsResult?.data?.defaultMarkupPercent;
+    }
+
+    // Query ALL rows from SQLite (offset=0, limit=-1 means all rows)
+    const result = await api.excel.querySheet(
+      currentFile.value,
+      currentSheetName.value,
+      0,
+      -1  // -1 means load all rows
+    );
+
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to load sheet data');
+    }
+
+    // Merge with metadata
+    const rowsWithMetadata = result.data.map(row => {
+      const rowHash = row._rowHash;
+      const meta = metadata.value[rowHash] || {};
+
+      return {
+        ...row,
+        _zzType: meta.zzType || row._zzType || '',
+        _markupPercent: meta.markupPercent !== undefined ? meta.markupPercent : (defaultMarkupPercent || null),
+        _markupManuallySet: meta.markupManuallySet || false,
+        _costType: meta.costType || 'Other', // Default to 'Other'
+        _sentToZzTakeoff: !!meta.lastSent,
+        _lastSent: meta.lastSent,
+        _sentCount: meta.sentCount || 0
+      };
+    });
+
+    rowData.value = rowsWithMetadata;
+    totalRowCount.value = result.totalRows;
+
+    console.log('[SQLite] Loaded', rowsWithMetadata.length, 'rows from sheet:', currentSheetName.value);
+  } catch (error) {
+    console.error('[SQLite] Error loading sheet data:', error);
+    rowData.value = [];
+  } finally {
+    loading.value = false;
+  }
+};
 
 // Load column mappings for sending to zzTakeoff
 const columnMappings = ref(null);
@@ -420,8 +499,23 @@ const onGridReady = (params) => {
   console.log('Grid ready');
 };
 
+// Sheet change handler
+const onSheetChange = async () => {
+  // Find the selected sheet
+  const selectedSheet = availableSheets.value.find(s => s.name === currentSheetName.value);
+  if (!selectedSheet) return;
+
+  // Update total row count
+  totalRowCount.value = selectedSheet.rowCount;
+
+  // Load data for the new sheet
+  await loadSheetData();
+
+  console.log('[SQLite] Switched to sheet:', currentSheetName.value, 'with', totalRowCount.value, 'rows');
+};
+
 // Cell value changed handler
-const onCellValueChanged = (event) => {
+const onCellValueChanged = async (event) => {
   hasUnsavedChanges.value = true;
 
   // Track if Markup % was manually edited
@@ -429,12 +523,6 @@ const onCellValueChanged = (event) => {
     // Mark this row's markup as manually set
     if (event.data && event.node) {
       event.data._markupManuallySet = true;
-
-      // Update the row in the main rowData array to trigger reactivity
-      const rowIndex = rowData.value.findIndex(r => r._rowHash === event.data._rowHash);
-      if (rowIndex !== -1) {
-        rowData.value[rowIndex]._markupManuallySet = true;
-      }
 
       // Force AG Grid to redraw this specific row (which re-evaluates cellStyle)
       if (gridApi.value) {
@@ -447,7 +535,36 @@ const onCellValueChanged = (event) => {
     }
   }
 
-  saveToSession(); // Persist changes
+  // Persist change to SQLite
+  if (currentFile.value && currentSheetName.value && event.data) {
+    try {
+      const rowId = event.data._id; // SQLite row ID
+      const field = event.colDef.field;
+      const newValue = event.newValue;
+
+      // Build updates object
+      const updates = {
+        [field]: newValue
+      };
+
+      // If markup was manually set, also update that flag
+      if (field === '_markupPercent') {
+        updates._markupManuallySet = true;
+      }
+
+      // Update in SQLite
+      await api.excel.updateRow(
+        currentFile.value,
+        currentSheetName.value,
+        rowId,
+        updates
+      );
+
+      console.log('[SQLite] Updated row', rowId, 'field', field, 'to', newValue);
+    } catch (error) {
+      console.error('[SQLite] Error updating row:', error);
+    }
+  }
 };
 
 // Selection changed handler
@@ -739,6 +856,7 @@ class ZzTypeEditor {
 
 // Cost Type dropdown options
 const costTypeOptions = [
+  { value: 'Other', label: 'Other' },
   { value: 'Subcontra', label: 'Subcontra' },
   { value: 'Material', label: 'Material' },
   { value: 'Labor', label: 'Labor' },
@@ -749,7 +867,7 @@ const costTypeOptions = [
 class CostTypeEditor {
   init(params) {
     this.params = params;
-    this.value = params.value || 'Subcontra';
+    this.value = params.value || 'Other'; // Default to 'Other'
 
     // Create select element
     this.eInput = document.createElement('select');
@@ -1186,19 +1304,19 @@ const loadExcelFile = async (filePath) => {
     loading.value = true;
     loadingMessage.value = 'Reading Excel file...';
 
-    // Read Excel file
+    // Read Excel file (now returns metadata only - data is in SQLite)
     const result = await api.excel.readFile(filePath);
     if (!result.success) {
       throw new Error(result.message || 'Failed to read Excel file');
     }
 
-    excelData.value = result.data;
-    currentFile.value = filePath;
-    currentFileName.value = result.data.fileName;
+    // Store file info
+    currentFile.value = result.filePath;
+    currentFileName.value = result.filePath.split(/[\\/]/).pop();
 
     loadingMessage.value = 'Loading metadata...';
 
-    // Load metadata
+    // Load metadata from hidden sheet
     const metadataResult = await api.excel.getMetadata(filePath);
     if (metadataResult.success) {
       metadata.value = metadataResult.metadata || {};
@@ -1209,43 +1327,69 @@ const loadExcelFile = async (filePath) => {
     // Load preferences (including column mappings and default markup %)
     const prefsResult = await api.preferencesStore.get();
     const preferences = prefsResult?.data || {};
-    const columnMappings = preferences.columnMappings || { preferredColumns: [] };
+    const columnMappingsData = preferences.columnMappings || { preferredColumns: [] };
     const defaultMarkupPercent = preferences.defaultMarkupPercent;
 
-    loadingMessage.value = 'Building grid...';
+    loadingMessage.value = 'Loading sheet list...';
 
-    // Get first sheet
-    const sheet = result.data.sheets[0];
+    // Get sheet list from SQLite
+    const sheetListResult = await api.excel.getSheetList(filePath);
+    if (!sheetListResult.success || !sheetListResult.sheets || sheetListResult.sheets.length === 0) {
+      throw new Error('No sheets found in Excel file');
+    }
+
+    // Set available sheets and select first sheet
+    availableSheets.value = sheetListResult.sheets;
+    currentSheetName.value = sheetListResult.sheets[0].name;
+    totalRowCount.value = sheetListResult.sheets[0].rowCount;
+
+    // Get first sheet metadata
+    const sheet = sheetListResult.sheets[0];
     if (!sheet) {
       throw new Error('No sheets found in Excel file');
     }
 
-    console.log('Original Excel headers:', sheet.headers);
-    console.log('Column mappings:', columnMappings);
+    console.log('Sheet columns from SQLite:', sheet.columns);
+    console.log('Column mappings:', columnMappingsData);
+
+    loadingMessage.value = 'Building grid...';
 
     // Build column definitions from mappings
     const cols = [];
 
-    // Get visible mapped columns sorted by order
-    const visibleColumns = columnMappings.preferredColumns
-      .filter(col => col.visible && col.excelColumn)
+    // Create a mapping from original column names to sanitized column names
+    const columnNameMap = {};
+    sheet.columns.forEach((originalCol, index) => {
+      const sanitizedCol = sheet.sanitizedColumns[index];
+      columnNameMap[originalCol] = sanitizedCol;
+    });
+
+    console.log('Column name mapping (original → sanitized):', columnNameMap);
+
+    // Get visible mapped columns sorted by order (EXCLUDE metadata columns - they're added manually below)
+    const visibleColumns = columnMappingsData.preferredColumns
+      .filter(col => col.visible && col.excelColumn && !col.isMetadata)
       .sort((a, b) => a.order - b.order);
 
     console.log('Visible mapped columns:', visibleColumns.length);
 
-    // Show ONLY mapped columns with preferred labels
+    // Show ONLY mapped columns with preferred labels (metadata columns like Markup % are added separately below)
     cols.push(...visibleColumns.map(prefCol => {
       const isDescriptionColumn = prefCol.id === 'description' || prefCol.id === 'name';
 
+      // Use sanitized column name as field (for SQLite data)
+      const sanitizedFieldName = columnNameMap[prefCol.excelColumn] || prefCol.excelColumn;
+
       const colDef = {
-        field: prefCol.excelColumn, // Use the Excel column name as the field
+        field: sanitizedFieldName, // Use the SANITIZED column name as the field
         headerName: prefCol.label,  // Use the preferred label as the header
         editable: true,
+        cellEditor: 'agTextCellEditor', // Force text editor to support alphanumeric values (e.g., SKU: "ABC123")
         minWidth: isDescriptionColumn ? 455 : 100, // 30% wider (350 * 1.3 = 455)
         flex: isDescriptionColumn ? 3 : 1,
         suppressMovable: false,
         cellClass: isDescriptionColumn ? 'description-column' : '',
-        tooltipField: isDescriptionColumn ? prefCol.excelColumn : undefined, // Show full text on hover
+        tooltipField: isDescriptionColumn ? sanitizedFieldName : undefined, // Show full text on hover
         tooltipComponentParams: isDescriptionColumn ? {
           color: '#ececec'
         } : undefined
@@ -1369,30 +1513,17 @@ const loadExcelFile = async (filePath) => {
 
     columnDefs.value = cols;
 
-    // Build row data and merge metadata
-    const rows = sheet.data.map(row => {
-      const rowHash = row._rowHash;
-      const meta = metadata.value[rowHash] || {};
-
-      return {
-        ...row,
-        // Priority: 1. Metadata (user manually set), 2. Unit mapping (auto from backend), 3. Empty
-        _zzType: meta.zzType || row._zzType || '',
-        // Priority: 1. User-set metadata, 2. Default from preferences, 3. null
-        _markupPercent: meta.markupPercent !== undefined ? meta.markupPercent : (defaultMarkupPercent || null),
-        _markupManuallySet: meta.markupManuallySet || false,
-        _costType: meta.costType || 'Subcontra',
-        _sentToZzTakeoff: !!meta.lastSent,
-        _lastSent: meta.lastSent,
-        _sentCount: meta.sentCount || 0
-      };
-    });
-
-    rowData.value = rows;
     hasUnsavedChanges.value = false;
 
-    // Save to session storage for persistence across tabs
-    saveToSession();
+    // Store a minimal excelData reference for compatibility
+    excelData.value = {
+      filePath: result.filePath,
+      fileName: currentFileName.value,
+      sheets: [{ name: sheet.name, columns: sheet.columns }]
+    };
+
+    // Load all rows from SQLite for the current sheet
+    await loadSheetData();
 
     // Add to recents
     await api.recentsStore.add({
@@ -1555,7 +1686,7 @@ const saveFileAs = async () => {
 };
 
 // Close file
-const closeFile = () => {
+const closeFile = async () => {
   console.log('[ExcelGrid] closeFile called, currentFile:', currentFile.value);
   if (!currentFile.value) {
     console.log('[ExcelGrid] No file to close');
@@ -1570,6 +1701,15 @@ const closeFile = () => {
     }
   }
 
+  // Close SQLite database
+  const fileToClose = currentFile.value;
+  try {
+    await api.excel.closeFile(fileToClose);
+    console.log('[SQLite] Database closed for file:', fileToClose);
+  } catch (error) {
+    console.error('[SQLite] Error closing database:', error);
+  }
+
   // Clear all state
   currentFile.value = null;
   currentFileName.value = '';
@@ -1578,6 +1718,9 @@ const closeFile = () => {
   excelData.value = null;
   metadata.value = {};
   hasUnsavedChanges.value = false;
+  availableSheets.value = [];
+  currentSheetName.value = '';
+  totalRowCount.value = 0;
 
   // Clear session storage
   clearSession();
@@ -1742,12 +1885,25 @@ onMounted(async () => {
   console.log('[ExcelGrid] Registering event listener for apply-default-markup');
   window.addEventListener('apply-default-markup', handleApplyDefaultMarkup);
   console.log('[ExcelGrid] Event listener registered successfully');
+
+  // Listen for force grid reload from Preferences tab
+  window.addEventListener('force-grid-reload', async () => {
+    console.log('[ExcelGrid] Force reload requested');
+    if (currentFile.value) {
+      await loadExcelFile(currentFile.value);
+    }
+  });
 });
 
 onUnmounted(() => {
   // Cleanup event listeners
   window.removeEventListener('load-excel-file', handleLoadFileEvent);
   window.removeEventListener('apply-default-markup', handleApplyDefaultMarkup);
+  window.removeEventListener('force-grid-reload', async () => {
+    if (currentFile.value) {
+      await loadExcelFile(currentFile.value);
+    }
+  });
 });
 </script>
 
