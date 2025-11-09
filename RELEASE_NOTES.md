@@ -5,10 +5,10 @@
 ## 📥 Download
 
 Download the installer for Windows:
-- [XLx Connector Setup 1.0.0.exe](https://github.com/YOUR-USERNAME/Excel-zzTakeoff-Connector/releases/download/v1.0.0/XLx.Connector.Setup.1.0.0.exe)
+- [XLx Connector Setup 1.0.0.exe](https://github.com/samromeo1961/Excel-zzTakeoff-Connector/releases/download/v1.0.0/XLx.Connector.Setup.1.0.0.exe)
 
 **File Size:** ~120 MB
-**SHA256 Checksum:** [To be added after upload]
+**SHA256 Checksum:** `996534683509e9bdff49ad1b2ab6ab9f2b65f8c09e21937dfc70d93212642a13`
 
 ---
 
@@ -23,7 +23,7 @@ Download the installer for Windows:
 3. **Click "Run anyway"** to proceed with installation
 4. **Click "Yes"** on the User Account Control (UAC) prompt
 
-**Detailed installation instructions with screenshots:** [View Beta Testing Guide](https://raw.githubusercontent.com/YOUR-USERNAME/Excel-zzTakeoff-Connector/master/BETA_TESTING_GUIDE.html) *(Right-click → Save As, then open in browser)*
+**Detailed installation instructions with screenshots:** [View Beta Testing Guide](https://raw.githubusercontent.com/samromeo1961/Excel-zzTakeoff-Connector/master/BETA_TESTING_GUIDE.html) *(Right-click → Save As, then open in browser)*
 
 ---
 
@@ -123,7 +123,7 @@ Download the installer for Windows:
 4. **Select shortcuts** (Desktop and Start Menu recommended)
 5. **Complete installation** and launch
 
-**Full installation guide with screenshots:** [BETA_TESTING_GUIDE.html](https://raw.githubusercontent.com/YOUR-USERNAME/Excel-zzTakeoff-Connector/master/BETA_TESTING_GUIDE.html)
+**Full installation guide with screenshots:** [BETA_TESTING_GUIDE.html](https://raw.githubusercontent.com/samromeo1961/Excel-zzTakeoff-Connector/master/BETA_TESTING_GUIDE.html)
 
 ---
 
@@ -153,7 +153,7 @@ Thank you for participating in the beta test! Your feedback is crucial for impro
 
 ### Report Issues
 
-**GitHub Issues:** [Report a bug or request a feature](https://github.com/YOUR-USERNAME/Excel-zzTakeoff-Connector/issues)
+**GitHub Issues:** [Report a bug or request a feature](https://github.com/samromeo1961/Excel-zzTakeoff-Connector/issues)
 
 **Include in your report:**
 - Steps to reproduce
@@ -207,9 +207,9 @@ Code signing certificates cost $300-$500+ annually and require business verifica
 
 ## 💬 Support & Community
 
-- **Issues:** [GitHub Issues](https://github.com/YOUR-USERNAME/Excel-zzTakeoff-Connector/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/YOUR-USERNAME/Excel-zzTakeoff-Connector/discussions)
-- **Email:** your-email@example.com
+- **Issues:** [GitHub Issues](https://github.com/samromeo1961/Excel-zzTakeoff-Connector/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/samromeo1961/Excel-zzTakeoff-Connector/discussions)
+- **Email:** Contact via GitHub
 
 ---
 
