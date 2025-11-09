@@ -126,20 +126,18 @@ function validateFilePath(filePath, options = {}) {
     throw new Error('Path traversal detected after normalization');
   }
 
-  // 7. TESTING MODE: Directory restrictions temporarily disabled
-  // TODO: Re-enable directory whitelist after testing phase
-  // const allowedDirs = getAllowedDirectories();
-  // const isInAllowedDir = allowedDirs.some(dir => {
-  //   if (!dir) return false;
-  //   const resolvedDir = path.resolve(dir);
-  //   return resolvedPath.startsWith(resolvedDir + path.sep) || resolvedPath === resolvedDir;
-  // });
-  // if (!isInAllowedDir) {
-  //   console.error('[PathValidator] File path not in allowed directory:', resolvedPath);
-  //   console.error('[PathValidator] Allowed directories:', allowedDirs);
-  //   throw new Error('File path is not in an allowed directory');
-  // }
-  console.log('[PathValidator] TESTING MODE: Directory restrictions disabled');
+  // 7. Validate directory whitelist
+  const allowedDirs = getAllowedDirectories();
+  const isInAllowedDir = allowedDirs.some(dir => {
+    if (!dir) return false;
+    const resolvedDir = path.resolve(dir);
+    return resolvedPath.startsWith(resolvedDir + path.sep) || resolvedPath === resolvedDir;
+  });
+  if (!isInAllowedDir) {
+    console.error('[PathValidator] File path not in allowed directory:', resolvedPath);
+    console.error('[PathValidator] Allowed directories:', allowedDirs);
+    throw new Error('File path is not in an allowed directory');
+  }
 
   // 8. Check file extension
   if (checkExtension) {
