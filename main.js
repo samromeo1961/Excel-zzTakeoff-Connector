@@ -492,6 +492,11 @@ ipcMain.handle('preferences-store:get-discovered-columns', preferencesStoreHandl
 ipcMain.handle('preferences-store:remove-discovered-column', preferencesStoreHandlers.handleRemoveDiscoveredColumn);
 ipcMain.handle('preferences-store:clear-discovered-columns', preferencesStoreHandlers.handleClearDiscoveredColumns);
 
+// File-Specific Column Mappings
+ipcMain.handle('preferences-store:get-file-column-mappings', preferencesStoreHandlers.handleGetFileColumnMappings);
+ipcMain.handle('preferences-store:save-file-column-mappings', preferencesStoreHandlers.handleSaveFileColumnMappings);
+ipcMain.handle('preferences-store:get-combined-column-mappings', preferencesStoreHandlers.handleGetCombinedColumnMappings);
+
 // ============================================================
 // IPC Handlers for Menu
 // ============================================================

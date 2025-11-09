@@ -27,9 +27,11 @@ function getDefaultPreferences() {
     unitMappings: [],
     // File-specific unit mappings: { "filepath": [{ unit: string, zzType: string, active: boolean }] }
     fileUnitMappings: {},
+    // File-specific column mappings: { "filepath": { preferredColumns: [...] } }
+    fileColumnMappings: {},
     // Discovered units pending user configuration: [{ unit: string, count: number, lastSeen: timestamp }]
     discoveredUnits: [],
-    // Column mappings for Excel Grid display
+    // Column mappings for Excel Grid display (GLOBAL - applies to all files if no file-specific mapping exists)
     columnMappings: {
       preferredColumns: [
         { id: 'sku', label: 'SKU', excelColumn: null, visible: true, sendToZzTakeoff: true, order: 0, isStandard: true, isMetadata: false },
@@ -536,17 +538,87 @@ function smartMatchColumns(excelColumns) {
 /**
  * Apply smart matching to column mappings
  * Automatically maps Excel columns to preferred columns based on similarity
+ *
  * @param {Array<string>} excelColumns - Array of Excel column names
+ * @param {string} filePath - Optional file path for file-specific mapping
  */
-function applySmartMatching(excelColumns) {
+function applySmartMatching(excelColumns, filePath = null) {
   const matches = smartMatchColumns(excelColumns);
 
-  // Apply the matches to the column mappings
-  Object.entries(matches).forEach(([preferredId, excelColumn]) => {
-    updatePreferredColumn(preferredId, { excelColumn });
-  });
+  if (filePath) {
+    // Save to file-specific column mappings
+    const fileMapping = getFileColumnMappings(filePath);
 
-  console.log(`[Smart Matching] Matched ${Object.keys(matches).length} columns:`, matches);
+    Object.entries(matches).forEach(([preferredId, excelColumn]) => {
+      const column = fileMapping.preferredColumns.find(c => c.id === preferredId);
+      if (column) {
+        column.excelColumn = excelColumn;
+      }
+    });
+
+    saveFileColumnMappings(filePath, fileMapping);
+    console.log(`[Smart Matching] Matched ${Object.keys(matches).length} columns for file:`, filePath);
+  } else {
+    // Save to global column mappings (backward compatibility)
+    Object.entries(matches).forEach(([preferredId, excelColumn]) => {
+      updatePreferredColumn(preferredId, { excelColumn });
+    });
+
+    console.log(`[Smart Matching] Matched ${Object.keys(matches).length} columns globally`);
+  }
+}
+
+/**
+ * Get file-specific column mappings for a file
+ * @param {string} filePath - File path
+ * @returns {Object} Column mappings for the file (or default if not set)
+ */
+function getFileColumnMappings(filePath) {
+  const prefs = getPreferences();
+  const fileColumnMappings = prefs.fileColumnMappings || {};
+
+  // If file-specific mappings exist, return them
+  if (fileColumnMappings[filePath]) {
+    return fileColumnMappings[filePath];
+  }
+
+  // Otherwise, return a copy of the default column mappings
+  const defaults = getDefaultPreferences();
+  return JSON.parse(JSON.stringify(defaults.columnMappings));
+}
+
+/**
+ * Save file-specific column mappings for a file
+ * @param {string} filePath - File path
+ * @param {Object} columnMappings - Column mappings object
+ */
+function saveFileColumnMappings(filePath, columnMappings) {
+  const prefs = getPreferences();
+  const fileColumnMappings = prefs.fileColumnMappings || {};
+  fileColumnMappings[filePath] = columnMappings;
+  updatePreference('fileColumnMappings', fileColumnMappings);
+}
+
+/**
+ * Get combined column mappings (file-specific if exists, otherwise global)
+ * @param {string} filePath - File path (optional)
+ * @returns {Object} Column mappings object
+ */
+function getCombinedColumnMappings(filePath) {
+  if (!filePath) {
+    return getColumnMappings();
+  }
+
+  const prefs = getPreferences();
+  const fileColumnMappings = prefs.fileColumnMappings || {};
+
+  // If file-specific mappings exist, use them
+  if (fileColumnMappings[filePath]) {
+    return fileColumnMappings[filePath];
+  }
+
+  // Otherwise, return global mappings
+  return getColumnMappings();
 }
 
 module.exports = {
@@ -579,5 +651,9 @@ module.exports = {
   clearDiscoveredColumns,
   resetColumnMappings,
   smartMatchColumns,
-  applySmartMatching
+  applySmartMatching,
+  // File-specific column mapping functions
+  getFileColumnMappings,
+  saveFileColumnMappings,
+  getCombinedColumnMappings
 };

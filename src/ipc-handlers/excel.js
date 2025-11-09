@@ -10,7 +10,7 @@
 
 const path = require('path');
 const { readExcelFile: read, writeExcelFile: write, createRowHash, extractUnits, applyZzTypeMappings, extractColumns, applyColumnMappings } = require('../excel/processor');
-const { getUnitMappings, getCombinedUnitMappings, addDiscoveredUnits, clearDiscoveredUnits, getColumnMappings, addDiscoveredColumns, clearDiscoveredColumns, applySmartMatching } = require('../database/preferences-store');
+const { getUnitMappings, getCombinedUnitMappings, addDiscoveredUnits, clearDiscoveredUnits, getColumnMappings, addDiscoveredColumns, clearDiscoveredColumns, applySmartMatching, getCombinedColumnMappings, getFileColumnMappings, saveFileColumnMappings } = require('../database/preferences-store');
 const excelDB = require('../database/excel-db');
 const { validateFilePath, validateFileSize } = require('../utils/path-validator');
 const logger = require('../utils/logger');
@@ -70,14 +70,15 @@ async function readExcelFile(event, filePath) {
       }));
 
       // CRITICAL: Apply smart column matching even on cache hits
-      // This updates preferences to map this file's columns to the preferred columns
+      // This updates FILE-SPECIFIC preferences to map this file's columns to the preferred columns
       // Without this, the Excel grid won't display data because column mappings won't match
       const firstSheet = sheetsMetadata.find(s => s.rowCount > 0);
       if (firstSheet && firstSheet.columns && firstSheet.columns.length > 0) {
         logger.logDebug('[Excel Handler] Applying smart column matching on cache hit', {
-          columnCount: firstSheet.columns.length
+          columnCount: firstSheet.columns.length,
+          filePath: validatedPath
         });
-        applySmartMatching(firstSheet.columns);
+        applySmartMatching(firstSheet.columns, validatedPath);
       }
 
       logger.logInfo('[Excel Handler] Cache load complete', { sheetCount: sheetsMetadata.length });
@@ -161,8 +162,8 @@ async function readExcelFile(event, filePath) {
     if (uniqueColumns.length > 0) {
       addDiscoveredColumns(uniqueColumns);
 
-      // Apply smart matching to automatically map columns
-      applySmartMatching(uniqueColumns);
+      // Apply smart matching to automatically map columns for THIS FILE
+      applySmartMatching(uniqueColumns, validatedPath);
     }
 
     logger.logInfo('[Excel Handler] Units discovered', { unitCount: uniqueUnits.length });

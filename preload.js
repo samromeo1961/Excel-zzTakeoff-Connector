@@ -76,7 +76,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Discovered Columns
     getDiscoveredColumns: () => ipcRenderer.invoke('preferences-store:get-discovered-columns'),
     removeDiscoveredColumn: (columnName) => ipcRenderer.invoke('preferences-store:remove-discovered-column', columnName),
-    clearDiscoveredColumns: () => ipcRenderer.invoke('preferences-store:clear-discovered-columns')
+    clearDiscoveredColumns: () => ipcRenderer.invoke('preferences-store:clear-discovered-columns'),
+    // File-Specific Column Mappings
+    getFileColumnMappings: (filePath) => ipcRenderer.invoke('preferences-store:get-file-column-mappings', filePath),
+    saveFileColumnMappings: (filePath, columnMappings) => ipcRenderer.invoke('preferences-store:save-file-column-mappings', { filePath, columnMappings }),
+    getCombinedColumnMappings: (filePath) => ipcRenderer.invoke('preferences-store:get-combined-column-mappings', filePath)
   },
 
   // Recents Store (electron-store persistent storage for recent files)

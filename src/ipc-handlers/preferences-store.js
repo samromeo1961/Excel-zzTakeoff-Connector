@@ -463,6 +463,71 @@ async function handleClearDiscoveredColumns(event, params) {
   }
 }
 
+// ============================================================================
+// File-Specific Column Mapping Handlers
+// ============================================================================
+
+/**
+ * Get file-specific column mappings
+ * IPC Handler: 'preferences-store:get-file-column-mappings'
+ */
+async function handleGetFileColumnMappings(event, filePath) {
+  try {
+    const validatedPath = validateString(filePath, 'filePath', { required: true, minLength: 1 });
+    logger.logDebug('[Preferences] Getting file-specific column mappings', { filePath: validatedPath });
+    const mappings = getFileColumnMappings(validatedPath);
+    return {
+      success: true,
+      data: mappings
+    };
+  } catch (err) {
+    logger.logError('[Preferences] Error getting file-specific column mappings', err);
+    return {
+      ...createErrorResponse(err, 'handleGetFileColumnMappings'),
+      data: { preferredColumns: [] }
+    };
+  }
+}
+
+/**
+ * Save file-specific column mappings
+ * IPC Handler: 'preferences-store:save-file-column-mappings'
+ */
+async function handleSaveFileColumnMappings(event, { filePath, columnMappings }) {
+  try {
+    const validatedPath = validateString(filePath, 'filePath', { required: true, minLength: 1 });
+    const validated = validateObject(columnMappings, 'columnMappings', { required: true });
+    logger.logInfo('[Preferences] Saving file-specific column mappings', { filePath: validatedPath });
+    saveFileColumnMappings(validatedPath, validated);
+    return { success: true };
+  } catch (err) {
+    logger.logError('[Preferences] Error saving file-specific column mappings', err);
+    return createErrorResponse(err, 'handleSaveFileColumnMappings');
+  }
+}
+
+/**
+ * Get combined column mappings (file-specific if exists, otherwise global)
+ * IPC Handler: 'preferences-store:get-combined-column-mappings'
+ */
+async function handleGetCombinedColumnMappings(event, filePath) {
+  try {
+    const validatedPath = filePath ? validateString(filePath, 'filePath', { required: true, minLength: 1 }) : null;
+    logger.logDebug('[Preferences] Getting combined column mappings', { filePath: validatedPath });
+    const mappings = getCombinedColumnMappings(validatedPath);
+    return {
+      success: true,
+      data: mappings
+    };
+  } catch (err) {
+    logger.logError('[Preferences] Error getting combined column mappings', err);
+    return {
+      ...createErrorResponse(err, 'handleGetCombinedColumnMappings'),
+      data: { preferredColumns: [] }
+    };
+  }
+}
+
 module.exports = {
   handleGetPreferences,
   handleSavePreferences,
@@ -489,5 +554,9 @@ module.exports = {
   handleGetDiscoveredColumns,
   handleRemoveDiscoveredColumn,
   handleClearDiscoveredColumns,
-  handleResetColumnMappings
+  handleResetColumnMappings,
+  // File-specific column mapping handlers
+  handleGetFileColumnMappings,
+  handleSaveFileColumnMappings,
+  handleGetCombinedColumnMappings
 };

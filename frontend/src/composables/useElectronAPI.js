@@ -140,7 +140,11 @@ export default function useElectronAPI() {
       // Discovered Columns
       getDiscoveredColumns: () => window.electronAPI?.preferencesStore.getDiscoveredColumns(),
       removeDiscoveredColumn: (columnName) => window.electronAPI?.preferencesStore.removeDiscoveredColumn(columnName),
-      clearDiscoveredColumns: () => window.electronAPI?.preferencesStore.clearDiscoveredColumns()
+      clearDiscoveredColumns: () => window.electronAPI?.preferencesStore.clearDiscoveredColumns(),
+      // File-Specific Column Mappings
+      getFileColumnMappings: (filePath) => window.electronAPI?.preferencesStore.getFileColumnMappings(filePath),
+      saveFileColumnMappings: (filePath, columnMappings) => window.electronAPI?.preferencesStore.saveFileColumnMappings(filePath, columnMappings),
+      getCombinedColumnMappings: (filePath) => window.electronAPI?.preferencesStore.getCombinedColumnMappings(filePath)
     },
 
     // Templates (database operations)
