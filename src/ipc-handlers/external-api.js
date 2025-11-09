@@ -133,8 +133,8 @@ async function sendToZzTakeoff(event, data) {
     // Validate required fields
     validateString(projectId, 'projectId', { required: true, minLength: 1 });
 
-    // For now, return sample success response
-    // TODO: Replace with actual API call when zzTakeoff API is available
+    // DEMO MODE: Return sample success response
+    // When zzTakeoff API is ready, use the commented implementation below
 
     logger.logInfo('[External API] Sending items to zzTakeoff (demo mode)', {
       projectId,
@@ -201,8 +201,8 @@ async function getZzTakeoffProjects(event, data) {
   try {
     logger.logInfo('[External API] Getting zzTakeoff projects (demo mode)');
 
-    // For now, return sample projects similar to zzTakeoff's structure
-    // TODO: Replace with actual API call when zzTakeoff API is available
+    // DEMO MODE: Return sample projects similar to zzTakeoff's structure
+    // When zzTakeoff API is ready, use the commented implementation below
 
     // Sample projects matching zzTakeoff's structure
     const sampleProjects = [

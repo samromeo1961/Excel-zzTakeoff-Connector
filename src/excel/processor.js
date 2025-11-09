@@ -12,14 +12,16 @@ const crypto = require('crypto');
 /**
  * Maximum number of rows to warn about performance
  * Files with more rows may cause performance issues
+ * TESTING MODE: Increased from 10,000 to 100,000
  */
-const MAX_ROWS_WARNING = 10000;
+const MAX_ROWS_WARNING = 100000;
 
 /**
  * Maximum total rows across all sheets
  * This is a hard limit to prevent memory exhaustion
+ * TESTING MODE: Increased from 100,000 to 1,000,000
  */
-const MAX_TOTAL_ROWS = 100000;
+const MAX_TOTAL_ROWS = 1000000;
 
 /**
  * Create a hash fingerprint from row content

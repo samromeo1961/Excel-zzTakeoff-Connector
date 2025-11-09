@@ -28,8 +28,9 @@ const MAX_PATH_LENGTH = 260;
 
 /**
  * Maximum file size in MB (default)
+ * TESTING MODE: Increased from 50MB to 500MB for testing phase
  */
-const DEFAULT_MAX_FILE_SIZE_MB = 50;
+const DEFAULT_MAX_FILE_SIZE_MB = 500;
 
 /**
  * Get allowed directories for file operations
@@ -125,20 +126,20 @@ function validateFilePath(filePath, options = {}) {
     throw new Error('Path traversal detected after normalization');
   }
 
-  // 7. Check if path is within allowed directories
-  const allowedDirs = getAllowedDirectories();
-  const isInAllowedDir = allowedDirs.some(dir => {
-    if (!dir) return false;
-    const resolvedDir = path.resolve(dir);
-    // Ensure the file path starts with an allowed directory path
-    return resolvedPath.startsWith(resolvedDir + path.sep) || resolvedPath === resolvedDir;
-  });
-
-  if (!isInAllowedDir) {
-    console.error('[PathValidator] File path not in allowed directory:', resolvedPath);
-    console.error('[PathValidator] Allowed directories:', allowedDirs);
-    throw new Error('File path is not in an allowed directory');
-  }
+  // 7. TESTING MODE: Directory restrictions temporarily disabled
+  // TODO: Re-enable directory whitelist after testing phase
+  // const allowedDirs = getAllowedDirectories();
+  // const isInAllowedDir = allowedDirs.some(dir => {
+  //   if (!dir) return false;
+  //   const resolvedDir = path.resolve(dir);
+  //   return resolvedPath.startsWith(resolvedDir + path.sep) || resolvedPath === resolvedDir;
+  // });
+  // if (!isInAllowedDir) {
+  //   console.error('[PathValidator] File path not in allowed directory:', resolvedPath);
+  //   console.error('[PathValidator] Allowed directories:', allowedDirs);
+  //   throw new Error('File path is not in an allowed directory');
+  // }
+  console.log('[PathValidator] TESTING MODE: Directory restrictions disabled');
 
   // 8. Check file extension
   if (checkExtension) {

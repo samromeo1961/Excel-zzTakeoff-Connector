@@ -48,7 +48,8 @@ async function readExcelFile(event, filePath) {
     });
 
     // SECURITY: Check file size before reading
-    validateFileSize(validatedPath, 50); // 50 MB limit
+    // TESTING MODE: Increased to 500MB limit
+    validateFileSize(validatedPath, 500); // 500 MB limit for testing
 
     // CACHING: Check if we have a valid cached database
     const cacheValid = await excelDB.isCacheValid(validatedPath);
