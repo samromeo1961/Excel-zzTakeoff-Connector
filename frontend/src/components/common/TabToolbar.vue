@@ -34,6 +34,12 @@
           <i class="bi bi-fullscreen-exit"></i>
         </button>
 
+        <!-- File Name (Discrete) - Only show if file is open -->
+        <div v-if="showFileInfo && currentFileName" class="file-name-discrete d-flex align-items-center gap-2 px-3 py-2" :title="currentFilePath || currentFileName">
+          <i class="bi bi-file-earmark-excel"></i>
+          <span class="small">{{ currentFileName }}</span>
+        </div>
+
         <!-- Tab Label -->
         <div class="grid-label d-flex align-items-center gap-2 px-3 py-2">
           <i :class="tabIcon"></i>
@@ -45,15 +51,19 @@
     <!-- Toolbar (only visible when NOT in fullscreen) -->
     <div v-if="!isFullscreen" class="toolbar border-bottom p-2 d-flex gap-2 align-items-center">
       <!-- File Info (Left Side) -->
-      <div v-if="showFileInfo && currentFileName" class="d-flex align-items-center gap-2">
-        <i class="bi bi-file-earmark-excel text-success"></i>
-        <span class="text-muted small">
-          {{ currentFileName }}
-        </span>
-        <span v-if="hasUnsavedChanges" class="badge bg-warning text-dark">
-          <i class="bi bi-circle-fill" style="font-size: 0.4rem;"></i>
-          Unsaved
-        </span>
+      <div v-if="showFileInfo && currentFileName" class="file-info-container d-flex align-items-center gap-2">
+        <i class="bi bi-file-earmark-excel text-success" style="font-size: 1.25rem;"></i>
+        <div class="d-flex align-items-center gap-2">
+          <strong class="file-name">{{ currentFileName }}</strong>
+          <span v-if="hasUnsavedChanges" class="badge bg-warning text-dark">
+            <i class="bi bi-circle-fill" style="font-size: 0.4rem;"></i>
+            Unsaved
+          </span>
+          <span v-if="showRowCount && displayedRowCount !== null" class="badge bg-secondary">
+            <i class="bi bi-list-ol"></i>
+            {{ displayedRowCount }}{{ displayedRowCount !== totalRowCount ? ` / ${totalRowCount}` : '' }} row{{ displayedRowCount !== 1 ? 's' : '' }}
+          </span>
+        </div>
       </div>
 
       <!-- Search Bar (Expands to fill available space) -->
@@ -97,6 +107,10 @@ const props = defineProps({
     type: String,
     default: ''
   },
+  currentFilePath: {
+    type: String,
+    default: ''
+  },
   hasUnsavedChanges: {
     type: Boolean,
     default: false
@@ -120,6 +134,18 @@ const props = defineProps({
   tabIcon: {
     type: String,
     default: 'bi bi-grid-3x3-gap'
+  },
+  displayedRowCount: {
+    type: Number,
+    default: null
+  },
+  totalRowCount: {
+    type: Number,
+    default: null
+  },
+  showRowCount: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -201,6 +227,18 @@ watch(() => searchText.value, (newValue) => {
   cursor: not-allowed;
 }
 
+/* File Name Discrete (Fullscreen) */
+.file-name-discrete {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.file-name-discrete:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
 /* Grid Label (Fullscreen) */
 .grid-label {
   background-color: rgba(0, 0, 0, 0.2);
@@ -268,6 +306,20 @@ watch(() => searchText.value, (newValue) => {
   color: #e4e4e4;
 }
 
+/* File info styling */
+.file-info-container {
+  background-color: rgba(40, 167, 69, 0.1);
+  padding: 0.5rem;
+  border-radius: 4px;
+  border-left: 3px solid #28a745;
+}
+
+.file-name {
+  font-size: 0.95rem;
+  color: var(--bs-body-color);
+}
+
+
 /* Dark mode file info visibility */
 [data-theme="dark"] .toolbar .text-muted {
   color: #adb5bd !important;
@@ -275,5 +327,14 @@ watch(() => searchText.value, (newValue) => {
 
 [data-theme="dark"] .toolbar .text-success {
   color: #28a745 !important;
+}
+
+[data-theme="dark"] .file-info-container {
+  background-color: rgba(40, 167, 69, 0.15);
+  border-left-color: #4caf50;
+}
+
+[data-theme="dark"] .file-name {
+  color: #e4e4e4;
 }
 </style>

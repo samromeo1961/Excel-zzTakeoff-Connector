@@ -44,15 +44,24 @@ function getRecents(params = {}) {
  */
 function addToRecents(item) {
   try {
-    const key = item.PriceCode || item.priceCode;
+    // For Excel files, use filePath as key; for other items, use PriceCode
+    const key = item.filePath || item.PriceCode || item.priceCode;
     const recentsObj = recentsStore.get('recents', {});
 
     const recentItem = {
       ...item,
       zzType: item.zzType || recentsObj[key]?.zzType || 'count', // Preserve existing zzType or default to 'count'
-      lastUsed: new Date().toISOString(),
+      lastUsed: item.lastOpened || new Date().toISOString(), // Use lastOpened for Excel files
+      lastOpened: item.lastOpened || new Date().toISOString(),
       useCount: (recentsObj[key]?.useCount || 0) + 1,
-      userId: 'default'
+      userId: 'default',
+      // Preserve metadata for Excel files
+      fileSize: item.fileSize || recentsObj[key]?.fileSize,
+      rowCount: item.rowCount || recentsObj[key]?.rowCount,
+      sheetCount: item.sheetCount || recentsObj[key]?.sheetCount,
+      sheetName: item.sheetName || recentsObj[key]?.sheetName,
+      dateCreated: item.dateCreated || recentsObj[key]?.dateCreated,
+      dateModified: item.dateModified || recentsObj[key]?.dateModified
     };
 
     recentsObj[key] = recentItem;

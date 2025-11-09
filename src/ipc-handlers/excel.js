@@ -9,6 +9,7 @@
  */
 
 const path = require('path');
+const fs = require('fs');
 const { readExcelFile: read, writeExcelFile: write, createRowHash, extractUnits, applyZzTypeMappings, extractColumns, applyColumnMappings } = require('../excel/processor');
 const { getUnitMappings, getCombinedUnitMappings, addDiscoveredUnits, clearDiscoveredUnits, getColumnMappings, addDiscoveredColumns, clearDiscoveredColumns, applySmartMatching, getCombinedColumnMappings, getFileColumnMappings, saveFileColumnMappings } = require('../database/preferences-store');
 const excelDB = require('../database/excel-db');
@@ -554,6 +555,60 @@ async function rescanFileForUnits(event, filePath) {
   }
 }
 
+/**
+ * Get file statistics for Excel file
+ * @param {Event} event - IPC event
+ * @param {string} filePath - Path to Excel file
+ * @returns {Promise<{success: boolean, data?: any, message?: string}>}
+ */
+async function getFileStats(event, filePath) {
+  try {
+    logger.logInfo('[Excel Handler] Getting file stats', { filePath });
+
+    // SECURITY: Validate file path before processing
+    const validatedPath = validateFilePath(filePath, {
+      mustExist: true,
+      checkExtension: true
+    });
+
+    // Get file stats from filesystem
+    const stats = fs.statSync(validatedPath);
+
+    // Get sheet information from SQLite cache
+    const sheets = await excelDB.getSheetList(validatedPath);
+
+    let totalRowCount = 0;
+    let sheetCount = 0;
+
+    let sheetName = '';
+    if (sheets && Array.isArray(sheets)) {
+      sheetCount = sheets.length;
+      totalRowCount = sheets.reduce((sum, sheet) => sum + (sheet.rowCount || 0), 0);
+      // Get the first sheet's name (or join all sheet names if multiple)
+      if (sheets.length === 1) {
+        sheetName = sheets[0].name;
+      } else if (sheets.length > 1) {
+        sheetName = sheets.map(s => s.name).join(', ');
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        fileSize: stats.size,
+        rowCount: totalRowCount,
+        sheetCount: sheetCount,
+        sheetName: sheetName,
+        dateCreated: stats.birthtime.toISOString(),
+        dateModified: stats.mtime.toISOString()
+      }
+    };
+  } catch (error) {
+    logger.logError('[Excel Handler] Error getting file stats', error);
+    return createErrorResponse(error, 'getFileStats');
+  }
+}
+
 module.exports = {
   readExcelFile,
   writeExcelFile,
@@ -563,5 +618,6 @@ module.exports = {
   updateSheetRow,
   getSheetList,
   closeFile,
-  rescanFileForUnits
+  rescanFileForUnits,
+  getFileStats
 };

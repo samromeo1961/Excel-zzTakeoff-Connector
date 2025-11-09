@@ -4,9 +4,13 @@
     <TabToolbar
       :is-fullscreen="isFullscreen"
       :current-file-name="currentFileName"
+      :current-file-path="currentFile"
       :has-unsaved-changes="hasUnsavedChanges"
       :show-file-info="!!currentFile"
       :show-search="!!currentFile"
+      :show-row-count="!!currentFile"
+      :displayed-row-count="displayedRowCount"
+      :total-row-count="totalRowCount"
       tab-label="Excel Grid"
       tab-icon="bi bi-grid-3x3-gap"
       @search="handleSearch"
@@ -53,6 +57,14 @@
           title="Update template from all Excel rows (based on SKU matching)"
         >
           <i class="bi bi-arrow-repeat"></i>
+        </button>
+        <button
+          @click="showColumnPicker = true"
+          class="btn btn-sm action-icon-btn"
+          :disabled="!currentFile"
+          title="Manage Columns (show/hide, reorder)"
+        >
+          <i class="bi bi-layout-three-columns"></i>
         </button>
       </template>
 
@@ -105,6 +117,15 @@
           title="Update template from all Excel rows (based on SKU matching)"
         >
           <i class="bi bi-arrow-repeat"></i>
+        </button>
+        <button
+          v-if="currentFile"
+          @click="showColumnPicker = true"
+          class="btn btn-sm btn-outline-secondary"
+          :disabled="!currentFile"
+          title="Manage Columns (show/hide, reorder)"
+        >
+          <i class="bi bi-layout-three-columns"></i> Columns
         </button>
       </template>
     </TabToolbar>
@@ -187,15 +208,23 @@
       @close="closeUpdateTemplateModal"
       @updated="handleTemplateUpdated"
     />
+
+    <ColumnPickerModal
+      :visible="showColumnPicker"
+      :columns="columnDefs"
+      @close="showColumnPicker = false"
+      @apply="handleColumnChanges"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, inject, onMounted, onUnmounted } from 'vue';
+import { ref, computed, inject, onMounted, onUnmounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { AgGridVue } from 'ag-grid-vue3';
 import SendToTemplateModal from '../Modals/SendToTemplateModal.vue';
 import UpdateTemplateModal from '../Modals/UpdateTemplateModal.vue';
+import ColumnPickerModal from './ColumnPickerModal.vue';
 import TabToolbar from '../common/TabToolbar.vue';
 import useElectronAPI from '../../composables/useElectronAPI';
 
@@ -237,6 +266,7 @@ const loadingMessage = ref('');
 const availableSheets = ref([]);
 const currentSheetName = ref('');
 const totalRowCount = ref(0);
+const displayedRowCount = ref(0);
 
 // Load all rows from SQLite for the current sheet
 const loadSheetData = async () => {
@@ -287,11 +317,14 @@ const loadSheetData = async () => {
 
     rowData.value = rowsWithMetadata;
     totalRowCount.value = result.totalRows;
+    displayedRowCount.value = rowsWithMetadata.length;
 
     console.log('[SQLite] Loaded', rowsWithMetadata.length, 'rows from sheet:', currentSheetName.value);
   } catch (error) {
     console.error('[SQLite] Error loading sheet data:', error);
     rowData.value = [];
+    totalRowCount.value = 0;
+    displayedRowCount.value = 0;
   } finally {
     loading.value = false;
   }
@@ -303,6 +336,7 @@ const columnMappings = ref(null);
 // Modal state for Send to Template
 const showSendToTemplateModal = ref(false);
 const showUpdateTemplateModal = ref(false);
+const showColumnPicker = ref(false);
 const selectedRows = ref([]);
 const selectedRowsCount = ref(0);
 
@@ -493,10 +527,29 @@ const rowsSent = computed(() => {
   return rowData.value.filter(row => row._sentToZzTakeoff).length;
 });
 
+// Update displayed row count
+const updateDisplayedRowCount = () => {
+  if (gridApi.value) {
+    displayedRowCount.value = gridApi.value.getDisplayedRowCount();
+  } else {
+    displayedRowCount.value = rowData.value.length;
+  }
+};
+
 // Grid ready handler
 const onGridReady = (params) => {
   gridApi.value = params.api;
   console.log('Grid ready');
+
+  // Note: We use fixed widths (150px) for most columns and flex for Description
+  // This gives Description all remaining space while keeping other columns compact
+
+  // Update displayed row count initially
+  updateDisplayedRowCount();
+
+  // Listen for filter changes to update count
+  params.api.addEventListener('filterChanged', updateDisplayedRowCount);
+  params.api.addEventListener('modelUpdated', updateDisplayedRowCount);
 };
 
 // Sheet change handler
@@ -797,6 +850,37 @@ const closeUpdateTemplateModal = () => {
 // Handle successful template update
 const handleTemplateUpdated = ({ templateId, added, updated, removed }) => {
   console.log(`Updated template ${templateId}: Added ${added}, Updated ${updated}, Removed ${removed}`);
+};
+
+// Handle column picker changes
+const handleColumnChanges = (updatedColumns) => {
+  console.log('[ExcelGrid] Column picker changes applied:', updatedColumns);
+
+  // Reorder and hide/show columns based on user's changes
+  const newColumnDefs = [];
+
+  updatedColumns.forEach((col, index) => {
+    const existingCol = columnDefs.value.find(c => c.field === col.field);
+    if (existingCol) {
+      newColumnDefs.push({
+        ...existingCol,
+        hide: !col.visible
+      });
+    }
+  });
+
+  // Update column definitions
+  columnDefs.value = newColumnDefs;
+
+  // Refresh the grid
+  if (gridApi.value) {
+    gridApi.value.setGridOption('columnDefs', newColumnDefs);
+    console.log('[ExcelGrid] Grid columns updated');
+  }
+
+  // Save the updated column state to session storage
+  saveToSession();
+  console.log('[ExcelGrid] Column changes saved to session');
 };
 
 // zzType dropdown options
@@ -1304,6 +1388,34 @@ const loadExcelFile = async (filePath) => {
     loading.value = true;
     loadingMessage.value = 'Reading Excel file...';
 
+    // Close the old file if one is currently open
+    if (currentFile.value && currentFile.value !== filePath) {
+      console.log('[ExcelGrid] Closing previous file:', currentFile.value);
+      loadingMessage.value = 'Closing previous file...';
+
+      // Clear session storage for the old file
+      try {
+        sessionStorage.removeItem(`excelGrid_${currentFile.value}`);
+        console.log('[ExcelGrid] Cleared session storage for previous file');
+      } catch (err) {
+        console.warn('[ExcelGrid] Failed to clear session storage:', err);
+      }
+
+      // Close the file in the backend
+      try {
+        await api.excel.closeFile(currentFile.value);
+      } catch (err) {
+        console.warn('[ExcelGrid] Failed to close previous file:', err);
+      }
+
+      // Clear grid data
+      rowData.value = [];
+      columnDefs.value = [];
+      selectedRows.value = [];
+      metadata.value = {};
+      console.log('[ExcelGrid] Cleared grid state');
+    }
+
     // Read Excel file (now returns metadata only - data is in SQLite)
     const result = await api.excel.readFile(filePath);
     if (!result.success) {
@@ -1388,8 +1500,40 @@ const loadExcelFile = async (filePath) => {
 
     console.log('Visible mapped columns:', visibleColumns.length);
 
-    // Show ONLY mapped columns with preferred labels (metadata columns like Markup % are added separately below)
-    cols.push(...visibleColumns.map(prefCol => {
+    // FALLBACK: If no column mappings configured, show ALL non-internal columns
+    if (visibleColumns.length === 0) {
+      console.log('[ExcelGrid] No column mappings configured - showing all columns as fallback');
+      const internalColumns = ['_rowIndex', '_rowHash', '_zzType', '_markupPercent', '_markupManuallySet'];
+      // Filter out internal columns AND auto-generated blank column names (Column8, Column9, etc.)
+      const dataColumns = sheet.columns.filter(col =>
+        !internalColumns.includes(col) &&
+        !col.match(/^Column\d+$/) // Exclude ColumnN pattern (blank columns)
+      );
+
+      dataColumns.forEach((originalCol, index) => {
+        const sanitizedCol = columnNameMap[originalCol] || originalCol;
+        // Check if this is a description/name column
+        const isDescriptionLike = /description|desc|name|title|item.*name/i.test(originalCol);
+
+        cols.push({
+          field: sanitizedCol,
+          headerName: originalCol, // Use original column name as header
+          editable: true,
+          cellEditor: 'agTextCellEditor',
+          minWidth: isDescriptionLike ? 300 : 100,
+          width: isDescriptionLike ? undefined : 150, // Fixed width for non-description columns
+          flex: isDescriptionLike ? 1 : 0, // Only description columns flex to fill space
+          suppressMovable: false,
+          wrapText: isDescriptionLike,
+          autoHeight: isDescriptionLike,
+          tooltipField: isDescriptionLike ? sanitizedCol : undefined
+        });
+      });
+
+      console.log('[ExcelGrid] Created', cols.length, 'fallback columns (filtered out', sheet.columns.length - dataColumns.length - internalColumns.length, 'blank columns)');
+    } else {
+      // Show ONLY mapped columns with preferred labels (metadata columns like Markup % are added separately below)
+      cols.push(...visibleColumns.map(prefCol => {
       const isDescriptionColumn = prefCol.id === 'description' || prefCol.id === 'name';
 
       // Use sanitized column name as field (for SQLite data)
@@ -1400,10 +1544,13 @@ const loadExcelFile = async (filePath) => {
         headerName: prefCol.label,  // Use the preferred label as the header
         editable: true,
         cellEditor: 'agTextCellEditor', // Force text editor to support alphanumeric values (e.g., SKU: "ABC123")
-        minWidth: isDescriptionColumn ? 455 : 100, // 30% wider (350 * 1.3 = 455)
-        flex: isDescriptionColumn ? 3 : 1,
+        minWidth: isDescriptionColumn ? 300 : 100,
+        width: isDescriptionColumn ? undefined : 150, // Fixed width for non-description columns
+        flex: isDescriptionColumn ? 1 : 0, // Only description columns flex to fill space
         suppressMovable: false,
         cellClass: isDescriptionColumn ? 'description-column' : '',
+        wrapText: isDescriptionColumn,
+        autoHeight: isDescriptionColumn,
         tooltipField: isDescriptionColumn ? sanitizedFieldName : undefined, // Show full text on hover
         tooltipComponentParams: isDescriptionColumn ? {
           color: '#ececec'
@@ -1413,7 +1560,8 @@ const loadExcelFile = async (filePath) => {
       return colDef;
     }));
 
-    console.log('Column definitions created:', visibleColumns.length, 'mapped columns');
+      console.log('[ExcelGrid] Column definitions created:', visibleColumns.length, 'mapped columns');
+    }
 
     // Add Markup % column (metadata column - user can type values)
     cols.push({
@@ -1540,12 +1688,29 @@ const loadExcelFile = async (filePath) => {
     // Load all rows from SQLite for the current sheet
     await loadSheetData();
 
-    // Add to recents
+    // Get file statistics for recents metadata
+    let fileStats = {};
+    try {
+      const statsResult = await api.excel.getFileStats(filePath);
+      if (statsResult && statsResult.success) {
+        fileStats = statsResult.data;
+      }
+    } catch (err) {
+      console.warn('[ExcelGrid] Failed to get file stats:', err);
+    }
+
+    // Add to recents with enhanced metadata
     await api.recentsStore.add({
       filePath,
       fileName: result.data.fileName,
       type: 'excel',
-      lastOpened: new Date().toISOString()
+      lastOpened: new Date().toISOString(),
+      // Enhanced metadata
+      fileSize: fileStats.fileSize,
+      rowCount: fileStats.rowCount,
+      sheetCount: fileStats.sheetCount || availableSheets.value.length,
+      dateCreated: fileStats.dateCreated,
+      dateModified: fileStats.dateModified
     });
 
     // Save as last opened file for auto-reload on next app start
@@ -1874,23 +2039,28 @@ onMounted(async () => {
     }
   }
 
-  if (api.onMenuOpenFile) {
-    api.onMenuOpenFile(openFile);
-  }
-  if (api.onMenuSaveFile) {
-    api.onMenuSaveFile(saveFile);
-  }
-  if (api.onMenuSaveFileAs) {
-    api.onMenuSaveFileAs(saveFileAs);
-  }
-  if (api.onMenuCloseFile) {
-    api.onMenuCloseFile(closeFile);
-  }
-  if (api.onMenuOpenRecentFile) {
-    api.onMenuOpenRecentFile(async (filePath) => {
-      console.log('[ExcelGrid] Opening recent file from menu:', filePath);
-      await loadExcelFile(filePath);
-    });
+  // Register menu event handlers only once (using a global flag to prevent duplicates)
+  if (!window._excelGridMenuHandlersRegistered) {
+    if (api.onMenuOpenFile) {
+      api.onMenuOpenFile(openFile);
+    }
+    if (api.onMenuSaveFile) {
+      api.onMenuSaveFile(saveFile);
+    }
+    if (api.onMenuSaveFileAs) {
+      api.onMenuSaveFileAs(saveFileAs);
+    }
+    if (api.onMenuCloseFile) {
+      api.onMenuCloseFile(closeFile);
+    }
+    if (api.onMenuOpenRecentFile) {
+      api.onMenuOpenRecentFile(async (filePath) => {
+        console.log('[ExcelGrid] Opening recent file from menu:', filePath);
+        await loadExcelFile(filePath);
+      });
+    }
+    window._excelGridMenuHandlersRegistered = true;
+    console.log('[ExcelGrid] Menu event handlers registered');
   }
 
   // Listen for custom event from Recent Files tab
@@ -1908,6 +2078,12 @@ onMounted(async () => {
       await loadExcelFile(currentFile.value);
     }
   });
+});
+
+onBeforeUnmount(() => {
+  // Save state to session storage before navigating away
+  console.log('[ExcelGrid] Component unmounting - saving state to session');
+  saveToSession();
 });
 
 onUnmounted(() => {
