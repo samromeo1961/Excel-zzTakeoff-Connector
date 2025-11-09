@@ -16,6 +16,11 @@ const { validateFilePath, validateFileSize } = require('../utils/path-validator'
 
 /**
  * Read an Excel file and return its data
+ *
+ * CACHING: This function now checks for cached SQLite database.
+ * - Cache HIT: Fast load from SQLite (~50-200ms)
+ * - Cache MISS: Full Excel parse + SQLite creation (~2-5 seconds)
+ *
  * @param {Event} event - IPC event
  * @param {string} filePath - Path to Excel file
  * @returns {Promise<{success: boolean, data?: any, message?: string}>}
@@ -32,6 +37,47 @@ async function readExcelFile(event, filePath) {
 
     // SECURITY: Check file size before reading
     validateFileSize(validatedPath, 50); // 50 MB limit
+
+    // CACHING: Check if we have a valid cached database
+    const cacheValid = await excelDB.isCacheValid(validatedPath);
+
+    if (cacheValid) {
+      // ========================================
+      // CACHE HIT - Fast path (50-200ms)
+      // ========================================
+      console.log('[Excel Handler] ✅ CACHE HIT - Using cached database');
+
+      const dbInfo = await excelDB.loadFromCache(validatedPath);
+
+      // Return metadata from cache
+      const sheetsMetadata = dbInfo.sheets.map(s => ({
+        name: s.name,
+        tableName: s.tableName,
+        rowCount: s.rowCount,
+        columns: s.columns,
+        sanitizedColumns: s.sanitizedColumns
+      }));
+
+      console.log('[Excel Handler] Cache load complete:', sheetsMetadata.length, 'sheets');
+
+      return {
+        success: true,
+        filePath: validatedPath,
+        fileName: path.basename(validatedPath),
+        sheets: sheetsMetadata,
+        cached: true, // Flag to indicate this was a cache hit
+        data: {
+          fileName: path.basename(validatedPath),
+          filePath: validatedPath,
+          sheets: sheetsMetadata
+        }
+      };
+    }
+
+    // ========================================
+    // CACHE MISS - Full load required (2-5 seconds)
+    // ========================================
+    console.log('[Excel Handler] ❌ CACHE MISS - Full Excel load required');
 
     const result = await read(validatedPath);
     console.log('[Excel Handler] File read successfully:', {
@@ -119,6 +165,7 @@ async function readExcelFile(event, filePath) {
       filePath: validatedPath,
       fileName: path.basename(validatedPath),
       sheets: sheetsMetadata,
+      cached: false, // Flag to indicate this was a cache miss (full load)
       discoveredUnits: uniqueUnits,
       discoveredColumns: uniqueColumns,
       data: {

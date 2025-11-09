@@ -8,10 +8,14 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
+const { app } = require('electron');
 
 // Store active database instances and SQL module
 const activeDatabases = new Map();
 let SQL = null;
+
+// Cache directory for persistent SQLite databases
+const CACHE_DIR_NAME = 'excel-cache';
 
 // Initialize sql.js
 async function initSQL() {
@@ -22,13 +26,101 @@ async function initSQL() {
 }
 
 /**
+ * Get cache directory path
+ * Creates the directory if it doesn't exist
+ * @returns {string} Cache directory path
+ */
+function getCacheDir() {
+  const cacheDir = path.join(app.getPath('userData'), CACHE_DIR_NAME);
+
+  // Create cache directory if it doesn't exist
+  if (!fs.existsSync(cacheDir)) {
+    fs.mkdirSync(cacheDir, { recursive: true });
+    console.log('[ExcelDB] Created cache directory:', cacheDir);
+  }
+
+  return cacheDir;
+}
+
+/**
  * Get database file path for an Excel file
+ *
+ * CACHING: Database is now stored in persistent userData directory
+ * instead of temp directory, allowing fast subsequent loads.
+ *
  * @param {string} excelFilePath - Path to the Excel file
- * @returns {string} Database file path
+ * @returns {string} Database file path in cache directory
  */
 function getDbPath(excelFilePath) {
   const fileHash = crypto.createHash('md5').update(excelFilePath).digest('hex');
-  return path.join(os.tmpdir(), `xlx-${fileHash}.db`);
+  const cacheDir = getCacheDir();
+  return path.join(cacheDir, `xlx-${fileHash}.db`);
+}
+
+/**
+ * Check if cached database is valid for an Excel file
+ *
+ * CACHE VALIDATION:
+ * - Checks if database file exists
+ * - Compares Excel file modification time with database creation time
+ * - Verifies database integrity
+ *
+ * @param {string} excelFilePath - Path to the Excel file
+ * @returns {Promise<boolean>} True if cache is valid and can be used
+ */
+async function isCacheValid(excelFilePath) {
+  try {
+    const dbPath = getDbPath(excelFilePath);
+
+    // Check if database file exists
+    if (!fs.existsSync(dbPath)) {
+      console.log('[ExcelDB] Cache miss: Database does not exist for', excelFilePath);
+      return false;
+    }
+
+    // Check if Excel file exists
+    if (!fs.existsSync(excelFilePath)) {
+      console.log('[ExcelDB] Cache invalid: Excel file does not exist');
+      return false;
+    }
+
+    // Compare modification times
+    const excelStats = fs.statSync(excelFilePath);
+    const dbStats = fs.statSync(dbPath);
+
+    // If Excel file is newer than database, cache is invalid
+    if (excelStats.mtime > dbStats.mtime) {
+      console.log('[ExcelDB] Cache invalid: Excel file modified since cache created');
+      console.log('[ExcelDB]   Excel mtime:', excelStats.mtime);
+      console.log('[ExcelDB]   DB mtime:', dbStats.mtime);
+      return false;
+    }
+
+    // Quick integrity check - try to open database
+    try {
+      const buffer = fs.readFileSync(dbPath);
+      const testDb = new SQL.Database(buffer);
+
+      // Verify database has tables
+      const tablesResult = testDb.exec("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'sheet_%'");
+      testDb.close();
+
+      if (!tablesResult.length || !tablesResult[0].values || tablesResult[0].values.length === 0) {
+        console.log('[ExcelDB] Cache invalid: Database has no sheet tables');
+        return false;
+      }
+    } catch (err) {
+      console.log('[ExcelDB] Cache invalid: Database integrity check failed:', err.message);
+      return false;
+    }
+
+    console.log('[ExcelDB] Cache HIT: Valid cache found for', excelFilePath);
+    return true;
+
+  } catch (err) {
+    console.error('[ExcelDB] Error checking cache validity:', err);
+    return false;
+  }
 }
 
 /**
@@ -51,11 +143,13 @@ async function getDatabase(excelFilePath) {
     try {
       const buffer = fs.readFileSync(dbPath);
       db = new SQL.Database(buffer);
+      console.log('[ExcelDB] Loaded existing database from cache:', dbPath);
     } catch (err) {
       console.warn('[ExcelDB] Could not load existing database, creating new one:', err.message);
       db = new SQL.Database();
     }
   } else {
+    console.log('[ExcelDB] Creating new database:', dbPath);
     db = new SQL.Database();
   }
 
@@ -77,7 +171,12 @@ function saveDatabase(excelFilePath) {
 }
 
 /**
- * Close and cleanup database for an Excel file
+ * Close database connection for an Excel file
+ *
+ * CACHING: Database file is now KEPT on disk for fast subsequent loads.
+ * The file is stored in the persistent cache directory and will be reused
+ * on next load if the Excel file hasn't been modified.
+ *
  * @param {string} excelFilePath - Path to the Excel file
  */
 function closeDatabase(excelFilePath) {
@@ -87,14 +186,10 @@ function closeDatabase(excelFilePath) {
     db.close();
     activeDatabases.delete(excelFilePath);
 
-    // Delete temporary database file
-    try {
-      if (fs.existsSync(dbPath)) {
-        fs.unlinkSync(dbPath);
-      }
-    } catch (err) {
-      console.error('[ExcelDB] Error deleting database files:', err);
-    }
+    // ✅ KEEP DATABASE FILE FOR CACHE
+    // Database is now persistent in userData/excel-cache/ directory
+    // This allows fast subsequent loads without re-parsing Excel file
+    console.log('[ExcelDB] Database closed and cached at:', dbPath);
   }
 }
 
@@ -495,6 +590,27 @@ async function getSheetList(excelFilePath) {
   return sheets;
 }
 
+/**
+ * Load database metadata from cache (fast path)
+ *
+ * This function is used when cache is valid to quickly load
+ * sheet metadata without re-parsing the Excel file.
+ *
+ * @param {string} excelFilePath - Path to the Excel file
+ * @returns {Promise<Object>} Database info with sheet metadata
+ */
+async function loadFromCache(excelFilePath) {
+  console.log('[ExcelDB] Loading from cache (fast path):', excelFilePath);
+
+  const sheets = await getSheetList(excelFilePath);
+
+  return {
+    filePath: excelFilePath,
+    sheets: sheets,
+    cached: true
+  };
+}
+
 module.exports = {
   getDatabase,
   closeDatabase,
@@ -502,5 +618,10 @@ module.exports = {
   querySheet,
   updateRow,
   exportToExcelFormat,
-  getSheetList
+  getSheetList,
+  // Cache management functions
+  isCacheValid,
+  loadFromCache,
+  getDbPath,
+  getCacheDir
 };

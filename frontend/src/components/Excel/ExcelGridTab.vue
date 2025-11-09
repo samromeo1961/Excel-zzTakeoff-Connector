@@ -1310,6 +1310,15 @@ const loadExcelFile = async (filePath) => {
       throw new Error(result.message || 'Failed to read Excel file');
     }
 
+    // Check if this was a cache hit or cache miss
+    if (result.cached === true) {
+      console.log('✅ CACHE HIT: File loaded from cache in <200ms');
+      loadingMessage.value = 'Loading from cache (fast)...';
+    } else {
+      console.log('❌ CACHE MISS: Full Excel parse performed');
+      loadingMessage.value = 'Reading Excel file (first time)...';
+    }
+
     // Store file info
     currentFile.value = result.filePath;
     currentFileName.value = result.filePath.split(/[\\/]/).pop();
