@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XLx Connector - Beta Testing Guide</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header .version {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section h2 {
+            color: #2c3e50;
+            font-size: 1.8em;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .section h3 {
+            color: #34495e;
+            font-size: 1.3em;
+            margin: 25px 0 12px 0;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border-left: 5px solid #ffc107;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .warning-box strong {
+            color: #856404;
+            display: block;
+            font-size: 1.1em;
+            margin-bottom: 8px;
+        }
+
+        .info-box {
+            background: #d1ecf1;
+            border-left: 5px solid #17a2b8;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .info-box strong {
+            color: #0c5460;
+            display: block;
+            font-size: 1.1em;
+            margin-bottom: 8px;
+        }
+
+        .success-box {
+            background: #d4edda;
+            border-left: 5px solid #28a745;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .success-box strong {
+            color: #155724;
+            display: block;
+            font-size: 1.1em;
+            margin-bottom: 8px;
+        }
+
+        .steps {
+            counter-reset: step-counter;
+            list-style: none;
+        }
+
+        .steps li {
+            counter-increment: step-counter;
+            margin-bottom: 25px;
+            padding-left: 50px;
+            position: relative;
+        }
+
+        .steps li::before {
+            content: counter(step-counter);
+            position: absolute;
+            left: 0;
+            top: 0;
+            background: #667eea;
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .steps li strong {
+            display: block;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #e83e8c;
+        }
+
+        .screenshot {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .screenshot img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+
+        .download-btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 40px;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 1.1em;
+            margin: 20px 0;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .feature-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .feature-item strong {
+            display: block;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .footer {
+            background: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            color: #6c757d;
+            border-top: 1px solid #dee2e6;
+        }
+
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        ul.bullet-list {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+
+        ul.bullet-list li {
+            margin-bottom: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        table th {
+            background: #2c3e50;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        table td {
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        table tr:hover {
+            background: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>XLx Connector</h1>
+            <p>Excel to zzTakeoff Integration Tool</p>
+            <span class="version">Beta Version 1.0.0</span>
+        </div>
+
+        <div class="content">
+            <!-- IMPORTANT WARNING -->
+            <div class="section">
+                <div class="warning-box">
+                    <strong>⚠️ IMPORTANT: Unsigned Application Notice</strong>
+                    <p>This beta version is <strong>NOT digitally signed</strong> with a code signing certificate. Windows will display security warnings when you try to install or run the application. This is normal for unsigned applications and does not mean the software is malicious.</p>
+                    <p style="margin-top: 10px;">Instructions for bypassing these warnings are provided below.</p>
+                </div>
+            </div>
+
+            <!-- DOWNLOAD -->
+            <div class="section">
+                <h2>📥 Download</h2>
+                <p>Download the latest beta installer from the GitHub Releases page:</p>
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="https://github.com/YOUR-USERNAME/Excel-zzTakeoff-Connector/releases" class="download-btn">
+                        Download XLx Connector Setup 1.0.0.exe
+                    </a>
+                </div>
+                <div class="info-box">
+                    <strong>ℹ️ System Requirements</strong>
+                    <ul class="bullet-list">
+                        <li>Windows 10 or Windows 11 (64-bit)</li>
+                        <li>300 MB free disk space</li>
+                        <li>No Excel installation required (uses SheetJS)</li>
+                        <li>Internet connection for zzTakeoff API integration</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- INSTALLATION INSTRUCTIONS -->
+            <div class="section">
+                <h2>🔧 Installation Instructions</h2>
+                <p>Follow these steps carefully to install the unsigned beta version:</p>
+
+                <h3>Step 1: Download the Installer</h3>
+                <ol class="steps">
+                    <li>
+                        <strong>Download the file</strong>
+                        Click the download link above to get <code>XLx Connector Setup 1.0.0.exe</code>
+                    </li>
+                    <li>
+                        <strong>Check your Downloads folder</strong>
+                        The file will be saved to your Downloads folder by default
+                    </li>
+                </ol>
+
+                <h3>Step 2: Bypass Windows SmartScreen Warning</h3>
+                <div class="warning-box">
+                    <strong>🛡️ You WILL see this warning:</strong>
+                    <p>"Windows protected your PC - Microsoft Defender SmartScreen prevented an unrecognized app from starting"</p>
+                </div>
+
+                <ol class="steps">
+                    <li>
+                        <strong>Double-click the installer</strong>
+                        Windows SmartScreen will block the installation initially
+                    </li>
+                    <li>
+                        <strong>Click "More info"</strong>
+                        Look for the small "More info" link in the SmartScreen dialog
+                    </li>
+                    <li>
+                        <strong>Click "Run anyway"</strong>
+                        After clicking "More info", a "Run anyway" button will appear. Click it to proceed.
+                    </li>
+                </ol>
+
+                <div class="screenshot">
+                    <p><strong>Screenshot Guide:</strong></p>
+                    <ol style="margin-left: 20px;">
+                        <li>First dialog: Click "More info" at the bottom</li>
+                        <li>Second dialog: Click "Run anyway" button</li>
+                    </ol>
+                </div>
+
+                <h3>Step 3: Complete Installation</h3>
+                <ol class="steps">
+                    <li>
+                        <strong>User Account Control (UAC) prompt</strong>
+                        Click "Yes" when Windows asks if you want to allow the app to make changes
+                    </li>
+                    <li>
+                        <strong>Choose installation location</strong>
+                        The default location is <code>C:\Users\[YourName]\AppData\Local\Programs\excel-zztakeoff-connector</code><br>
+                        You can change this if desired
+                    </li>
+                    <li>
+                        <strong>Select options</strong>
+                        <ul class="bullet-list">
+                            <li>✅ Create desktop shortcut (recommended)</li>
+                            <li>✅ Create Start Menu shortcut (recommended)</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>Click Install</strong>
+                        Wait for installation to complete (usually 30-60 seconds)
+                    </li>
+                    <li>
+                        <strong>Launch the application</strong>
+                        Check "Run XLx Connector" and click "Finish"
+                    </li>
+                </ol>
+            </div>
+
+            <!-- FIRST RUN -->
+            <div class="section">
+                <h2>🚀 First Run</h2>
+                <p>When you first launch XLx Connector, you may see another security warning:</p>
+
+                <div class="warning-box">
+                    <strong>🛡️ Windows Defender or Antivirus Warning</strong>
+                    <p>Some antivirus software may flag unsigned Electron applications. If this happens:</p>
+                    <ol class="bullet-list">
+                        <li>Click "Allow" or "Run anyway"</li>
+                        <li>Add an exception for <code>XLx Connector.exe</code> in your antivirus settings</li>
+                        <li>The application is safe - it's just not signed with a commercial certificate</li>
+                    </ol>
+                </div>
+
+                <div class="success-box">
+                    <strong>✅ Application Should Now Open Successfully</strong>
+                    <p>You should see the main XLx Connector window with five tabs: Excel Grid, Recents, History, zzTakeoff Web, and Preferences.</p>
+                </div>
+            </div>
+
+            <!-- FEATURES -->
+            <div class="section">
+                <h2>✨ Beta Features</h2>
+                <div class="feature-list">
+                    <div class="feature-item">
+                        <strong>📊 Excel Grid View</strong>
+                        <p>View and edit Excel files with AG Grid interface, no Excel installation needed</p>
+                    </div>
+                    <div class="feature-item">
+                        <strong>🕐 Recent Files</strong>
+                        <p>Quick access to recently opened files with metadata and visual indicators</p>
+                    </div>
+                    <div class="feature-item">
+                        <strong>📋 Send History</strong>
+                        <p>Track all data sent to zzTakeoff API with timestamps and status</p>
+                    </div>
+                    <div class="feature-item">
+                        <strong>🌐 zzTakeoff Web</strong>
+                        <p>Integrated browser for zzTakeoff web interface with persistent login</p>
+                    </div>
+                    <div class="feature-item">
+                        <strong>⚙️ Preferences</strong>
+                        <p>Customize theme, API settings, and application behavior</p>
+                    </div>
+                    <div class="feature-item">
+                        <strong>🗄️ SQLite Caching</strong>
+                        <p>10-100x faster file loading with database caching</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KEYBOARD SHORTCUTS -->
+            <div class="section">
+                <h2>⌨️ Keyboard Shortcuts</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Shortcut</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>Ctrl+1</code></td>
+                            <td>Navigate to Excel Grid tab</td>
+                        </tr>
+                        <tr>
+                            <td><code>Ctrl+2</code></td>
+                            <td>Navigate to Recents tab</td>
+                        </tr>
+                        <tr>
+                            <td><code>Ctrl+3</code></td>
+                            <td>Navigate to History tab</td>
+                        </tr>
+                        <tr>
+                            <td><code>Ctrl+4</code></td>
+                            <td>Navigate to zzTakeoff Web tab</td>
+                        </tr>
+                        <tr>
+                            <td><code>Ctrl+5</code></td>
+                            <td>Navigate to Preferences tab</td>
+                        </tr>
+                        <tr>
+                            <td><code>Ctrl+O</code></td>
+                            <td>Open Excel file</td>
+                        </tr>
+                        <tr>
+                            <td><code>Ctrl+S</code></td>
+                            <td>Save current file</td>
+                        </tr>
+                        <tr>
+                            <td><code>Ctrl+Shift+S</code></td>
+                            <td>Save As</td>
+                        </tr>
+                        <tr>
+                            <td><code>F12</code></td>
+                            <td>Open Developer Tools</td>
+                        </tr>
+                        <tr>
+                            <td><code>F1</code></td>
+                            <td>Open Help</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- BETA TESTING -->
+            <div class="section">
+                <h2>🧪 Beta Testing Guidelines</h2>
+                <h3>What to Test</h3>
+                <ul class="bullet-list">
+                    <li><strong>Excel File Loading:</strong> Try opening various .xlsx, .xls, .xlsm, and .csv files</li>
+                    <li><strong>Data Editing:</strong> Edit cells, change zzType values, modify markup percentages</li>
+                    <li><strong>Send to zzTakeoff:</strong> Test sending data to zzTakeoff API (requires valid credentials)</li>
+                    <li><strong>Recent Files:</strong> Open multiple files and verify they appear in Recents tab</li>
+                    <li><strong>Search & Filter:</strong> Use search bars and AG Grid filters</li>
+                    <li><strong>Theme Switching:</strong> Test light/dark mode in Preferences</li>
+                    <li><strong>Column Management:</strong> Show/hide columns, reorder columns</li>
+                    <li><strong>Multi-sheet Files:</strong> Test files with multiple sheets</li>
+                </ul>
+
+                <h3>How to Report Issues</h3>
+                <div class="info-box">
+                    <strong>📝 Please report bugs on GitHub Issues:</strong>
+                    <p><a href="https://github.com/YOUR-USERNAME/Excel-zzTakeoff-Connector/issues">https://github.com/YOUR-USERNAME/Excel-zzTakeoff-Connector/issues</a></p>
+                    <p style="margin-top: 10px;"><strong>Include in your report:</strong></p>
+                    <ul class="bullet-list">
+                        <li>Steps to reproduce the issue</li>
+                        <li>Expected behavior vs actual behavior</li>
+                        <li>Screenshots if applicable</li>
+                        <li>Console error messages (press F12 to open Developer Tools)</li>
+                        <li>Your Windows version</li>
+                        <li>File type/size if issue is related to file loading</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- KNOWN ISSUES -->
+            <div class="section">
+                <h2>⚠️ Known Issues</h2>
+                <ul class="bullet-list">
+                    <li><strong>Unsigned Warning:</strong> Windows SmartScreen will always show a warning (this is expected)</li>
+                    <li><strong>Large Files:</strong> Files over 10,000 rows may take longer to load on first open</li>
+                    <li><strong>File Locking:</strong> Close the file in XLx Connector before opening in Excel</li>
+                    <li><strong>Database Caching:</strong> First load creates SQLite cache, subsequent loads are faster</li>
+                </ul>
+            </div>
+
+            <!-- UNINSTALLATION -->
+            <div class="section">
+                <h2>🗑️ Uninstallation</h2>
+                <p>To uninstall XLx Connector:</p>
+                <ol class="steps">
+                    <li>
+                        <strong>Open Windows Settings</strong>
+                        Press <code>Win+I</code> or search for "Settings"
+                    </li>
+                    <li>
+                        <strong>Go to Apps</strong>
+                        Click "Apps" → "Installed apps"
+                    </li>
+                    <li>
+                        <strong>Find XLx Connector</strong>
+                        Search for "XLx Connector" or "Excel-zzTakeoff Connector"
+                    </li>
+                    <li>
+                        <strong>Uninstall</strong>
+                        Click the three dots (⋯) → "Uninstall"
+                    </li>
+                </ol>
+
+                <p style="margin-top: 20px;"><strong>Note:</strong> Application data is stored at:</p>
+                <ul class="bullet-list">
+                    <li>Settings: <code>C:\Users\[YourName]\AppData\Roaming\excel-zztakeoff-connector\</code></li>
+                    <li>SQLite Cache: <code>C:\Users\[YourName]\AppData\Roaming\excel-zztakeoff-connector\excel-cache\</code></li>
+                </ul>
+            </div>
+
+            <!-- SUPPORT -->
+            <div class="section">
+                <h2>💬 Support</h2>
+                <div class="success-box">
+                    <strong>Need Help?</strong>
+                    <ul class="bullet-list">
+                        <li><strong>GitHub Issues:</strong> <a href="https://github.com/YOUR-USERNAME/Excel-zzTakeoff-Connector/issues">Report bugs or request features</a></li>
+                        <li><strong>GitHub Discussions:</strong> <a href="https://github.com/YOUR-USERNAME/Excel-zzTakeoff-Connector/discussions">Ask questions or share feedback</a></li>
+                        <li><strong>Email:</strong> your-email@example.com</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- WHY UNSIGNED -->
+            <div class="section">
+                <h2>🔒 Why Is This Application Unsigned?</h2>
+                <p>Code signing certificates cost $300-$500+ per year and require business verification. For beta testing purposes, we've chosen to distribute an unsigned version to get feedback from testers before investing in a certificate.</p>
+
+                <div class="info-box">
+                    <strong>Is it safe to run unsigned software?</strong>
+                    <p>While you should generally be cautious about unsigned software, this beta is distributed through GitHub from a known source. You can:</p>
+                    <ul class="bullet-list">
+                        <li>Verify the source repository on GitHub</li>
+                        <li>Review the source code (it's open source!)</li>
+                        <li>Check file hashes to ensure integrity</li>
+                        <li>Run in a virtual machine if you prefer extra caution</li>
+                    </ul>
+                    <p style="margin-top: 10px;"><strong>Future releases will be signed</strong> once we receive enough positive feedback from beta testers.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>XLx Connector</strong> - Beta Version 1.0.0</p>
+            <p style="margin-top: 10px;">Built with Electron, Vue 3, and AG Grid</p>
+            <p style="margin-top: 5px;">
+                <a href="https://github.com/YOUR-USERNAME/Excel-zzTakeoff-Connector">GitHub Repository</a> •
+                <a href="https://github.com/YOUR-USERNAME/Excel-zzTakeoff-Connector/releases">Releases</a> •
+                <a href="https://github.com/YOUR-USERNAME/Excel-zzTakeoff-Connector/issues">Report Issue</a>
+            </p>
+            <p style="margin-top: 20px; font-size: 0.9em; color: #999;">
+                © 2025 XLx Connector. Licensed under MIT License.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
