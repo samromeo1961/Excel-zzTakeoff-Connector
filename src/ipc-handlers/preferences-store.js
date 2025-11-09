@@ -26,6 +26,9 @@ const {
   getCombinedUnitMappings,
   addFileUnitMapping
 } = require('../database/preferences-store');
+const logger = require('../utils/logger');
+const { createErrorResponse } = require('../utils/error-handler');
+const { validateIPCParams, validateString, validateObject, validateArray } = require('../utils/validators');
 
 /**
  * Get all preferences
@@ -33,17 +36,16 @@ const {
  */
 async function handleGetPreferences(event, params) {
   try {
+    logger.logDebug('[Preferences] Getting preferences');
     const preferences = getPreferences();
     return {
       success: true,
       data: preferences
     };
   } catch (err) {
-    console.error('Error getting preferences:', err);
+    logger.logError('[Preferences] Error getting preferences', err);
     return {
-      success: false,
-      error: 'Failed to get preferences',
-      message: err.message,
+      ...createErrorResponse(err, 'handleGetPreferences'),
       data: getDefaultPreferences()
     };
   }
@@ -55,14 +57,12 @@ async function handleGetPreferences(event, params) {
  */
 async function handleSavePreferences(event, preferences) {
   try {
-    return savePreferences(preferences);
+    const validated = validateObject(preferences, 'preferences', { required: true });
+    logger.logInfo('[Preferences] Saving preferences');
+    return savePreferences(validated);
   } catch (err) {
-    console.error('Error saving preferences:', err);
-    return {
-      success: false,
-      error: 'Failed to save preferences',
-      message: err.message
-    };
+    logger.logError('[Preferences] Error saving preferences', err);
+    return createErrorResponse(err, 'handleSavePreferences');
   }
 }
 
@@ -72,14 +72,11 @@ async function handleSavePreferences(event, preferences) {
  */
 async function handleResetPreferences(event, params) {
   try {
+    logger.logInfo('[Preferences] Resetting preferences to defaults');
     return resetPreferences();
   } catch (err) {
-    console.error('Error resetting preferences:', err);
-    return {
-      success: false,
-      error: 'Failed to reset preferences',
-      message: err.message
-    };
+    logger.logError('[Preferences] Error resetting preferences', err);
+    return createErrorResponse(err, 'handleResetPreferences');
   }
 }
 
@@ -89,14 +86,12 @@ async function handleResetPreferences(event, params) {
  */
 async function handleUpdatePreference(event, { key, value }) {
   try {
-    return updatePreference(key, value);
+    const validatedKey = validateString(key, 'key', { required: true, minLength: 1 });
+    logger.logInfo('[Preferences] Updating preference', { key: validatedKey });
+    return updatePreference(validatedKey, value);
   } catch (err) {
-    console.error('Error updating preference:', err);
-    return {
-      success: false,
-      error: 'Failed to update preference',
-      message: err.message
-    };
+    logger.logError('[Preferences] Error updating preference', err);
+    return createErrorResponse(err, 'handleUpdatePreference');
   }
 }
 
@@ -106,17 +101,14 @@ async function handleUpdatePreference(event, { key, value }) {
  */
 async function handleGetDefaultPreferences(event, params) {
   try {
+    logger.logDebug('[Preferences] Getting default preferences');
     return {
       success: true,
       data: getDefaultPreferences()
     };
   } catch (err) {
-    console.error('Error getting default preferences:', err);
-    return {
-      success: false,
-      error: 'Failed to get default preferences',
-      message: err.message
-    };
+    logger.logError('[Preferences] Error getting default preferences', err);
+    return createErrorResponse(err, 'handleGetDefaultPreferences');
   }
 }
 
@@ -126,15 +118,14 @@ async function handleGetDefaultPreferences(event, params) {
  */
 async function handleSaveUnitMapping(event, { unit, zzType, active }) {
   try {
-    saveUnitMapping(unit, zzType, active);
+    const validatedUnit = validateString(unit, 'unit', { required: true, minLength: 1 });
+    const validatedZzType = validateString(zzType, 'zzType', { required: true, minLength: 1 });
+    logger.logInfo('[Preferences] Saving unit mapping', { unit: validatedUnit, zzType: validatedZzType });
+    saveUnitMapping(validatedUnit, validatedZzType, active);
     return { success: true };
   } catch (err) {
-    console.error('Error saving unit mapping:', err);
-    return {
-      success: false,
-      error: 'Failed to save unit mapping',
-      message: err.message
-    };
+    logger.logError('[Preferences] Error saving unit mapping', err);
+    return createErrorResponse(err, 'handleSaveUnitMapping');
   }
 }
 
@@ -144,15 +135,13 @@ async function handleSaveUnitMapping(event, { unit, zzType, active }) {
  */
 async function handleDeleteUnitMapping(event, unit) {
   try {
-    deleteUnitMapping(unit);
+    const validatedUnit = validateString(unit, 'unit', { required: true, minLength: 1 });
+    logger.logInfo('[Preferences] Deleting unit mapping', { unit: validatedUnit });
+    deleteUnitMapping(validatedUnit);
     return { success: true };
   } catch (err) {
-    console.error('Error deleting unit mapping:', err);
-    return {
-      success: false,
-      error: 'Failed to delete unit mapping',
-      message: err.message
-    };
+    logger.logError('[Preferences] Error deleting unit mapping', err);
+    return createErrorResponse(err, 'handleDeleteUnitMapping');
   }
 }
 
@@ -162,17 +151,16 @@ async function handleDeleteUnitMapping(event, unit) {
  */
 async function handleGetUnitMappings(event, params) {
   try {
+    logger.logDebug('[Preferences] Getting unit mappings');
     const mappings = getUnitMappings();
     return {
       success: true,
       data: mappings
     };
   } catch (err) {
-    console.error('Error getting unit mappings:', err);
+    logger.logError('[Preferences] Error getting unit mappings', err);
     return {
-      success: false,
-      error: 'Failed to get unit mappings',
-      message: err.message,
+      ...createErrorResponse(err, 'handleGetUnitMappings'),
       data: []
     };
   }
@@ -184,17 +172,16 @@ async function handleGetUnitMappings(event, params) {
  */
 async function handleGetDiscoveredUnits(event, params) {
   try {
+    logger.logDebug('[Preferences] Getting discovered units');
     const discovered = getDiscoveredUnits();
     return {
       success: true,
       data: discovered
     };
   } catch (err) {
-    console.error('Error getting discovered units:', err);
+    logger.logError('[Preferences] Error getting discovered units', err);
     return {
-      success: false,
-      error: 'Failed to get discovered units',
-      message: err.message,
+      ...createErrorResponse(err, 'handleGetDiscoveredUnits'),
       data: []
     };
   }
@@ -206,15 +193,13 @@ async function handleGetDiscoveredUnits(event, params) {
  */
 async function handleRemoveDiscoveredUnit(event, unit) {
   try {
-    removeDiscoveredUnit(unit);
+    const validatedUnit = validateString(unit, 'unit', { required: true, minLength: 1 });
+    logger.logInfo('[Preferences] Removing discovered unit', { unit: validatedUnit });
+    removeDiscoveredUnit(validatedUnit);
     return { success: true };
   } catch (err) {
-    console.error('Error removing discovered unit:', err);
-    return {
-      success: false,
-      error: 'Failed to remove discovered unit',
-      message: err.message
-    };
+    logger.logError('[Preferences] Error removing discovered unit', err);
+    return createErrorResponse(err, 'handleRemoveDiscoveredUnit');
   }
 }
 
@@ -228,15 +213,14 @@ async function handleRemoveDiscoveredUnit(event, unit) {
  */
 async function handleSaveFileUnitMappings(event, { filePath, mappings }) {
   try {
-    saveFileUnitMappings(filePath, mappings);
+    const validatedPath = validateString(filePath, 'filePath', { required: true, minLength: 1 });
+    const validatedMappings = validateArray(mappings, 'mappings', { required: true });
+    logger.logInfo('[Preferences] Saving file-specific unit mappings', { filePath: validatedPath, count: validatedMappings.length });
+    saveFileUnitMappings(validatedPath, validatedMappings);
     return { success: true };
   } catch (err) {
-    console.error('Error saving file-specific unit mappings:', err);
-    return {
-      success: false,
-      error: 'Failed to save file-specific unit mappings',
-      message: err.message
-    };
+    logger.logError('[Preferences] Error saving file-specific unit mappings', err);
+    return createErrorResponse(err, 'handleSaveFileUnitMappings');
   }
 }
 
@@ -246,17 +230,17 @@ async function handleSaveFileUnitMappings(event, { filePath, mappings }) {
  */
 async function handleGetFileUnitMappings(event, filePath) {
   try {
-    const mappings = getFileUnitMappings(filePath);
+    const validatedPath = validateString(filePath, 'filePath', { required: true, minLength: 1 });
+    logger.logDebug('[Preferences] Getting file-specific unit mappings', { filePath: validatedPath });
+    const mappings = getFileUnitMappings(validatedPath);
     return {
       success: true,
       data: mappings
     };
   } catch (err) {
-    console.error('Error getting file-specific unit mappings:', err);
+    logger.logError('[Preferences] Error getting file-specific unit mappings', err);
     return {
-      success: false,
-      error: 'Failed to get file-specific unit mappings',
-      message: err.message,
+      ...createErrorResponse(err, 'handleGetFileUnitMappings'),
       data: []
     };
   }
@@ -268,17 +252,17 @@ async function handleGetFileUnitMappings(event, filePath) {
  */
 async function handleGetCombinedUnitMappings(event, filePath) {
   try {
-    const mappings = getCombinedUnitMappings(filePath);
+    const validatedPath = validateString(filePath, 'filePath', { required: true, minLength: 1 });
+    logger.logDebug('[Preferences] Getting combined unit mappings', { filePath: validatedPath });
+    const mappings = getCombinedUnitMappings(validatedPath);
     return {
       success: true,
       data: mappings
     };
   } catch (err) {
-    console.error('Error getting combined unit mappings:', err);
+    logger.logError('[Preferences] Error getting combined unit mappings', err);
     return {
-      success: false,
-      error: 'Failed to get combined unit mappings',
-      message: err.message,
+      ...createErrorResponse(err, 'handleGetCombinedUnitMappings'),
       data: []
     };
   }
@@ -290,15 +274,15 @@ async function handleGetCombinedUnitMappings(event, filePath) {
  */
 async function handleAddFileUnitMapping(event, { filePath, unit, zzType, active }) {
   try {
-    addFileUnitMapping(filePath, unit, zzType, active);
+    const validatedPath = validateString(filePath, 'filePath', { required: true, minLength: 1 });
+    const validatedUnit = validateString(unit, 'unit', { required: true, minLength: 1 });
+    const validatedZzType = validateString(zzType, 'zzType', { required: true, minLength: 1 });
+    logger.logInfo('[Preferences] Adding file-specific unit mapping', { filePath: validatedPath, unit: validatedUnit });
+    addFileUnitMapping(validatedPath, validatedUnit, validatedZzType, active);
     return { success: true };
   } catch (err) {
-    console.error('Error adding file-specific unit mapping:', err);
-    return {
-      success: false,
-      error: 'Failed to add file-specific unit mapping',
-      message: err.message
-    };
+    logger.logError('[Preferences] Error adding file-specific unit mapping', err);
+    return createErrorResponse(err, 'handleAddFileUnitMapping');
   }
 }
 
@@ -312,17 +296,16 @@ async function handleAddFileUnitMapping(event, { filePath, unit, zzType, active 
  */
 async function handleGetColumnMappings(event, params) {
   try {
+    logger.logDebug('[Preferences] Getting column mappings');
     const mappings = getColumnMappings();
     return {
       success: true,
       data: mappings
     };
   } catch (err) {
-    console.error('Error getting column mappings:', err);
+    logger.logError('[Preferences] Error getting column mappings', err);
     return {
-      success: false,
-      error: 'Failed to get column mappings',
-      message: err.message,
+      ...createErrorResponse(err, 'handleGetColumnMappings'),
       data: { preferredColumns: [] }
     };
   }
@@ -334,15 +317,13 @@ async function handleGetColumnMappings(event, params) {
  */
 async function handleSaveColumnMappings(event, columnMappings) {
   try {
-    saveColumnMappings(columnMappings);
+    const validated = validateObject(columnMappings, 'columnMappings', { required: true });
+    logger.logInfo('[Preferences] Saving column mappings');
+    saveColumnMappings(validated);
     return { success: true };
   } catch (err) {
-    console.error('Error saving column mappings:', err);
-    return {
-      success: false,
-      error: 'Failed to save column mappings',
-      message: err.message
-    };
+    logger.logError('[Preferences] Error saving column mappings', err);
+    return createErrorResponse(err, 'handleSaveColumnMappings');
   }
 }
 
@@ -352,15 +333,14 @@ async function handleSaveColumnMappings(event, columnMappings) {
  */
 async function handleUpdatePreferredColumn(event, { columnId, updates }) {
   try {
-    updatePreferredColumn(columnId, updates);
+    const validatedId = validateString(columnId, 'columnId', { required: true, minLength: 1 });
+    const validatedUpdates = validateObject(updates, 'updates', { required: true });
+    logger.logInfo('[Preferences] Updating preferred column', { columnId: validatedId });
+    updatePreferredColumn(validatedId, validatedUpdates);
     return { success: true };
   } catch (err) {
-    console.error('Error updating preferred column:', err);
-    return {
-      success: false,
-      error: 'Failed to update preferred column',
-      message: err.message
-    };
+    logger.logError('[Preferences] Error updating preferred column', err);
+    return createErrorResponse(err, 'handleUpdatePreferredColumn');
   }
 }
 
@@ -370,18 +350,17 @@ async function handleUpdatePreferredColumn(event, { columnId, updates }) {
  */
 async function handleAddCustomColumn(event, { label, excelColumn }) {
   try {
-    const id = addCustomColumn(label, excelColumn);
+    const validatedLabel = validateString(label, 'label', { required: true, minLength: 1 });
+    const validatedColumn = validateString(excelColumn, 'excelColumn', { required: false });
+    logger.logInfo('[Preferences] Adding custom column', { label: validatedLabel });
+    const id = addCustomColumn(validatedLabel, validatedColumn);
     return {
       success: true,
       data: { id }
     };
   } catch (err) {
-    console.error('Error adding custom column:', err);
-    return {
-      success: false,
-      error: 'Failed to add custom column',
-      message: err.message
-    };
+    logger.logError('[Preferences] Error adding custom column', err);
+    return createErrorResponse(err, 'handleAddCustomColumn');
   }
 }
 
@@ -391,15 +370,13 @@ async function handleAddCustomColumn(event, { label, excelColumn }) {
  */
 async function handleDeleteCustomColumn(event, columnId) {
   try {
-    deleteCustomColumn(columnId);
+    const validatedId = validateString(columnId, 'columnId', { required: true, minLength: 1 });
+    logger.logInfo('[Preferences] Deleting custom column', { columnId: validatedId });
+    deleteCustomColumn(validatedId);
     return { success: true };
   } catch (err) {
-    console.error('Error deleting custom column:', err);
-    return {
-      success: false,
-      error: 'Failed to delete custom column',
-      message: err.message
-    };
+    logger.logError('[Preferences] Error deleting custom column', err);
+    return createErrorResponse(err, 'handleDeleteCustomColumn');
   }
 }
 
@@ -409,15 +386,13 @@ async function handleDeleteCustomColumn(event, columnId) {
  */
 async function handleReorderColumns(event, columnIds) {
   try {
-    reorderColumns(columnIds);
+    const validated = validateArray(columnIds, 'columnIds', { required: true, minLength: 1 });
+    logger.logInfo('[Preferences] Reordering columns', { count: validated.length });
+    reorderColumns(validated);
     return { success: true };
   } catch (err) {
-    console.error('Error reordering columns:', err);
-    return {
-      success: false,
-      error: 'Failed to reorder columns',
-      message: err.message
-    };
+    logger.logError('[Preferences] Error reordering columns', err);
+    return createErrorResponse(err, 'handleReorderColumns');
   }
 }
 
@@ -427,17 +402,16 @@ async function handleReorderColumns(event, columnIds) {
  */
 async function handleGetDiscoveredColumns(event, params) {
   try {
+    logger.logDebug('[Preferences] Getting discovered columns');
     const discovered = getDiscoveredColumns();
     return {
       success: true,
       data: discovered
     };
   } catch (err) {
-    console.error('Error getting discovered columns:', err);
+    logger.logError('[Preferences] Error getting discovered columns', err);
     return {
-      success: false,
-      error: 'Failed to get discovered columns',
-      message: err.message,
+      ...createErrorResponse(err, 'handleGetDiscoveredColumns'),
       data: []
     };
   }
@@ -449,15 +423,13 @@ async function handleGetDiscoveredColumns(event, params) {
  */
 async function handleRemoveDiscoveredColumn(event, columnName) {
   try {
-    removeDiscoveredColumn(columnName);
+    const validated = validateString(columnName, 'columnName', { required: true, minLength: 1 });
+    logger.logInfo('[Preferences] Removing discovered column', { columnName: validated });
+    removeDiscoveredColumn(validated);
     return { success: true };
   } catch (err) {
-    console.error('Error removing discovered column:', err);
-    return {
-      success: false,
-      error: 'Failed to remove discovered column',
-      message: err.message
-    };
+    logger.logError('[Preferences] Error removing discovered column', err);
+    return createErrorResponse(err, 'handleRemoveDiscoveredColumn');
   }
 }
 
@@ -467,15 +439,12 @@ async function handleRemoveDiscoveredColumn(event, columnName) {
  */
 async function handleResetColumnMappings(event, params) {
   try {
+    logger.logInfo('[Preferences] Resetting column mappings to defaults');
     resetColumnMappings();
     return { success: true };
   } catch (err) {
-    console.error('Error resetting column mappings:', err);
-    return {
-      success: false,
-      error: 'Failed to reset column mappings',
-      message: err.message
-    };
+    logger.logError('[Preferences] Error resetting column mappings', err);
+    return createErrorResponse(err, 'handleResetColumnMappings');
   }
 }
 
@@ -485,15 +454,12 @@ async function handleResetColumnMappings(event, params) {
  */
 async function handleClearDiscoveredColumns(event, params) {
   try {
+    logger.logInfo('[Preferences] Clearing all discovered columns');
     clearDiscoveredColumns();
     return { success: true };
   } catch (err) {
-    console.error('Error clearing discovered columns:', err);
-    return {
-      success: false,
-      error: 'Failed to clear discovered columns',
-      message: err.message
-    };
+    logger.logError('[Preferences] Error clearing discovered columns', err);
+    return createErrorResponse(err, 'handleClearDiscoveredColumns');
   }
 }
 

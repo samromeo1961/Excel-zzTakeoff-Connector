@@ -13,6 +13,17 @@ const { readExcelFile: read, writeExcelFile: write, createRowHash, extractUnits,
 const { getUnitMappings, getCombinedUnitMappings, addDiscoveredUnits, clearDiscoveredUnits, getColumnMappings, addDiscoveredColumns, clearDiscoveredColumns, applySmartMatching } = require('../database/preferences-store');
 const excelDB = require('../database/excel-db');
 const { validateFilePath, validateFileSize } = require('../utils/path-validator');
+const logger = require('../utils/logger');
+const { wrapHandler, createErrorResponse } = require('../utils/error-handler');
+const {
+  validateIPCParams,
+  validateSheetName,
+  validateRowId,
+  validateOffset,
+  validateLimit,
+  validateUpdates,
+  validateObject
+} = require('../utils/validators');
 
 /**
  * Read an Excel file and return its data
@@ -27,7 +38,7 @@ const { validateFilePath, validateFileSize } = require('../utils/path-validator'
  */
 async function readExcelFile(event, filePath) {
   try {
-    console.log('[Excel Handler] Reading file:', filePath);
+    logger.logInfo('[Excel Handler] Reading file', { filePath });
 
     // SECURITY: Validate file path before processing
     const validatedPath = validateFilePath(filePath, {
@@ -45,7 +56,7 @@ async function readExcelFile(event, filePath) {
       // ========================================
       // CACHE HIT - Fast path (50-200ms)
       // ========================================
-      console.log('[Excel Handler] ✅ CACHE HIT - Using cached database');
+      logger.logInfo('[Excel Handler] ✅ CACHE HIT - Using cached database', { filePath: validatedPath });
 
       const dbInfo = await excelDB.loadFromCache(validatedPath);
 
@@ -58,7 +69,18 @@ async function readExcelFile(event, filePath) {
         sanitizedColumns: s.sanitizedColumns
       }));
 
-      console.log('[Excel Handler] Cache load complete:', sheetsMetadata.length, 'sheets');
+      // CRITICAL: Apply smart column matching even on cache hits
+      // This updates preferences to map this file's columns to the preferred columns
+      // Without this, the Excel grid won't display data because column mappings won't match
+      const firstSheet = sheetsMetadata.find(s => s.rowCount > 0);
+      if (firstSheet && firstSheet.columns && firstSheet.columns.length > 0) {
+        logger.logDebug('[Excel Handler] Applying smart column matching on cache hit', {
+          columnCount: firstSheet.columns.length
+        });
+        applySmartMatching(firstSheet.columns);
+      }
+
+      logger.logInfo('[Excel Handler] Cache load complete', { sheetCount: sheetsMetadata.length });
 
       return {
         success: true,
@@ -77,12 +99,12 @@ async function readExcelFile(event, filePath) {
     // ========================================
     // CACHE MISS - Full load required (2-5 seconds)
     // ========================================
-    console.log('[Excel Handler] ❌ CACHE MISS - Full Excel load required');
+    logger.logInfo('[Excel Handler] ❌ CACHE MISS - Full Excel load required', { filePath: validatedPath });
 
     const result = await read(validatedPath);
-    console.log('[Excel Handler] File read successfully:', {
-      sheets: result.sheets.length,
-      rows: result.sheets[0]?.data.length || 0
+    logger.logInfo('[Excel Handler] File read successfully', {
+      sheetCount: result.sheets.length,
+      rowCount: result.sheets[0]?.data.length || 0
     });
 
     // Extract units from FIRST SHEET ONLY
@@ -143,13 +165,13 @@ async function readExcelFile(event, filePath) {
       applySmartMatching(uniqueColumns);
     }
 
-    console.log('[Excel Handler] Units discovered:', uniqueUnits.length);
-    console.log('[Excel Handler] Columns discovered:', uniqueColumns.length);
+    logger.logInfo('[Excel Handler] Units discovered', { unitCount: uniqueUnits.length });
+    logger.logInfo('[Excel Handler] Columns discovered', { columnCount: uniqueColumns.length });
 
     // Load data into SQLite for performance
-    console.log('[Excel Handler] Loading data into SQLite...');
+    logger.logInfo('[Excel Handler] Loading data into SQLite', { filePath: validatedPath });
     const dbInfo = await excelDB.loadExcelToDatabase(validatedPath, result.sheets);
-    console.log('[Excel Handler] SQLite database ready:', dbInfo.sheets.length, 'sheets');
+    logger.logInfo('[Excel Handler] SQLite database ready', { sheetCount: dbInfo.sheets.length });
 
     // Return metadata only (not all data)
     const sheetsMetadata = dbInfo.sheets.map(s => ({
@@ -175,8 +197,8 @@ async function readExcelFile(event, filePath) {
       }
     };
   } catch (error) {
-    console.error('[Excel Handler] Error reading file:', error);
-    return { success: false, message: error.message };
+    logger.logError('[Excel Handler] Error reading file', error);
+    return createErrorResponse(error, 'readExcelFile');
   }
 }
 
@@ -190,8 +212,10 @@ async function readExcelFile(event, filePath) {
  */
 async function writeExcelFile(event, params) {
   try {
-    const { filePath, data } = params;
-    console.log('[Excel Handler] Writing file:', filePath);
+    const validated = validateIPCParams(params, 'writeExcelFile');
+    const { filePath, data } = validated;
+
+    logger.logInfo('[Excel Handler] Writing file', { filePath });
 
     // SECURITY: Validate file path before writing
     const validatedPath = validateFilePath(filePath, {
@@ -200,11 +224,11 @@ async function writeExcelFile(event, params) {
     });
 
     await write(validatedPath, data);
-    console.log('[Excel Handler] File written successfully');
+    logger.logInfo('[Excel Handler] File written successfully', { filePath: validatedPath });
     return { success: true };
   } catch (error) {
-    console.error('[Excel Handler] Error writing file:', error);
-    return { success: false, message: error.message };
+    logger.logError('[Excel Handler] Error writing file', error);
+    return createErrorResponse(error, 'writeExcelFile');
   }
 }
 
@@ -216,7 +240,7 @@ async function writeExcelFile(event, params) {
  */
 async function getMetadata(event, filePath) {
   try {
-    console.log('[Excel Handler] Getting metadata from:', filePath);
+    logger.logInfo('[Excel Handler] Getting metadata', { filePath });
 
     // SECURITY: Validate file path
     const validatedPath = validateFilePath(filePath, {
@@ -230,7 +254,7 @@ async function getMetadata(event, filePath) {
     const metadataSheet = result.sheets.find(sheet => sheet.name === '_zzTakeoffMetadata');
 
     if (!metadataSheet) {
-      console.log('[Excel Handler] No metadata sheet found');
+      logger.logDebug('[Excel Handler] No metadata sheet found', { filePath: validatedPath });
       return { success: true, metadata: {} };
     }
 
@@ -247,11 +271,11 @@ async function getMetadata(event, filePath) {
       }
     });
 
-    console.log('[Excel Handler] Metadata loaded:', Object.keys(metadata).length, 'entries');
+    logger.logInfo('[Excel Handler] Metadata loaded', { entryCount: Object.keys(metadata).length });
     return { success: true, metadata };
   } catch (error) {
-    console.error('[Excel Handler] Error getting metadata:', error);
-    return { success: false, message: error.message };
+    logger.logError('[Excel Handler] Error getting metadata', error);
+    return createErrorResponse(error, 'getMetadata');
   }
 }
 
@@ -265,14 +289,19 @@ async function getMetadata(event, filePath) {
  */
 async function saveMetadata(event, params) {
   try {
-    const { filePath, metadata } = params;
-    console.log('[Excel Handler] Saving metadata to:', filePath);
+    const validated = validateIPCParams(params, 'saveMetadata');
+    const { filePath, metadata } = validated;
+
+    logger.logInfo('[Excel Handler] Saving metadata', { filePath });
 
     // SECURITY: Validate file path
     const validatedPath = validateFilePath(filePath, {
       mustExist: true,
       checkExtension: true
     });
+
+    // Validate metadata is an object
+    validateObject(metadata, 'metadata', { required: true });
 
     // Read current file
     const result = await read(validatedPath);
@@ -301,11 +330,11 @@ async function saveMetadata(event, params) {
 
     // Write back to file
     await write(validatedPath, result);
-    console.log('[Excel Handler] Metadata saved:', metadataData.length, 'entries');
+    logger.logInfo('[Excel Handler] Metadata saved', { entryCount: metadataData.length });
     return { success: true };
   } catch (error) {
-    console.error('[Excel Handler] Error saving metadata:', error);
-    return { success: false, message: error.message };
+    logger.logError('[Excel Handler] Error saving metadata', error);
+    return createErrorResponse(error, 'saveMetadata');
   }
 }
 
@@ -321,26 +350,38 @@ async function saveMetadata(event, params) {
  */
 async function querySheetData(event, params) {
   try {
-    const { filePath, sheetName, offset = 0, limit = 100 } = params;
-    console.log('[Excel Handler] Querying sheet:', sheetName, 'offset:', offset, 'limit:', limit);
+    const validated = validateIPCParams(params, 'querySheetData');
+    const { filePath, sheetName, offset = 0, limit = 100 } = validated;
 
-    // SECURITY: Validate file path
+    // Validate each parameter
     const validatedPath = validateFilePath(filePath, {
       mustExist: false, // Database file might be in temp directory
       checkExtension: true
     });
+    const validatedSheetName = validateSheetName(sheetName);
+    const validatedOffset = validateOffset(offset);
+    const validatedLimit = validateLimit(limit);
 
-    const result = await excelDB.querySheet(validatedPath, sheetName, { offset, limit });
+    logger.logInfo('[Excel Handler] Querying sheet', {
+      sheetName: validatedSheetName,
+      offset: validatedOffset,
+      limit: validatedLimit
+    });
 
-    console.log('[Excel Handler] Query complete:', result.data.length, 'rows returned');
+    const result = await excelDB.querySheet(validatedPath, validatedSheetName, {
+      offset: validatedOffset,
+      limit: validatedLimit
+    });
+
+    logger.logDebug('[Excel Handler] Query complete', { rowsReturned: result.data.length });
 
     return {
       success: true,
       ...result
     };
   } catch (error) {
-    console.error('[Excel Handler] Error querying sheet:', error);
-    return { success: false, message: error.message };
+    logger.logError('[Excel Handler] Error querying sheet', error);
+    return createErrorResponse(error, 'querySheetData');
   }
 }
 
@@ -356,24 +397,40 @@ async function querySheetData(event, params) {
  */
 async function updateSheetRow(event, params) {
   try {
-    const { filePath, sheetName, rowId, updates } = params;
-    console.log('[Excel Handler] Updating row:', rowId, 'in sheet:', sheetName);
+    const validated = validateIPCParams(params, 'updateSheetRow');
+    const { filePath, sheetName, rowId, updates } = validated;
 
-    // SECURITY: Validate file path
+    // Validate each parameter
     const validatedPath = validateFilePath(filePath, {
       mustExist: false,
       checkExtension: true
     });
+    const validatedSheetName = validateSheetName(sheetName);
+    const validatedRowId = validateRowId(rowId);
+    const validatedUpdates = validateUpdates(updates);
 
-    const success = await excelDB.updateRow(validatedPath, sheetName, rowId, updates);
+    logger.logInfo('[Excel Handler] Updating row', {
+      sheetName: validatedSheetName,
+      rowId: validatedRowId,
+      updateFields: Object.keys(validatedUpdates)
+    });
+
+    const success = await excelDB.updateRow(
+      validatedPath,
+      validatedSheetName,
+      validatedRowId,
+      validatedUpdates
+    );
+
+    logger.logDebug('[Excel Handler] Update result', { success });
 
     return {
       success,
       message: success ? 'Row updated successfully' : 'Row not found'
     };
   } catch (error) {
-    console.error('[Excel Handler] Error updating row:', error);
-    return { success: false, message: error.message };
+    logger.logError('[Excel Handler] Error updating row', error);
+    return createErrorResponse(error, 'updateSheetRow');
   }
 }
 
@@ -385,6 +442,8 @@ async function updateSheetRow(event, params) {
  */
 async function getSheetList(event, filePath) {
   try {
+    logger.logDebug('[Excel Handler] Getting sheet list', { filePath });
+
     // SECURITY: Validate file path
     const validatedPath = validateFilePath(filePath, {
       mustExist: false,
@@ -392,13 +451,16 @@ async function getSheetList(event, filePath) {
     });
 
     const sheets = await excelDB.getSheetList(validatedPath);
+
+    logger.logDebug('[Excel Handler] Sheet list retrieved', { sheetCount: sheets.length });
+
     return {
       success: true,
       sheets
     };
   } catch (error) {
-    console.error('[Excel Handler] Error getting sheet list:', error);
-    return { success: false, message: error.message };
+    logger.logError('[Excel Handler] Error getting sheet list', error);
+    return createErrorResponse(error, 'getSheetList');
   }
 }
 
@@ -410,7 +472,7 @@ async function getSheetList(event, filePath) {
  */
 async function closeFile(event, filePath) {
   try {
-    console.log('[Excel Handler] Closing database for file:', filePath);
+    logger.logInfo('[Excel Handler] Closing database', { filePath });
 
     // SECURITY: Validate file path
     const validatedPath = validateFilePath(filePath, {
@@ -419,10 +481,13 @@ async function closeFile(event, filePath) {
     });
 
     excelDB.closeDatabase(validatedPath);
+
+    logger.logDebug('[Excel Handler] Database closed', { filePath: validatedPath });
+
     return { success: true };
   } catch (error) {
-    console.error('[Excel Handler] Error closing file:', error);
-    return { success: false, message: error.message };
+    logger.logError('[Excel Handler] Error closing file', error);
+    return createErrorResponse(error, 'closeFile');
   }
 }
 
@@ -434,7 +499,7 @@ async function closeFile(event, filePath) {
  */
 async function rescanFileForUnits(event, filePath) {
   try {
-    console.log('[Excel Handler] Re-scanning file for units:', filePath);
+    logger.logInfo('[Excel Handler] Re-scanning file for units', { filePath });
 
     // SECURITY: Validate file path
     const validatedPath = validateFilePath(filePath, {
@@ -473,15 +538,18 @@ async function rescanFileForUnits(event, filePath) {
       }
     }
 
-    console.log('[Excel Handler] Re-scan complete. Units discovered:', uniqueUnits.length);
+    logger.logInfo('[Excel Handler] Re-scan complete', {
+      totalUnits: uniqueUnits.length,
+      unmappedUnits: uniqueUnits.filter(unit => !unitMappings.some(m => m.unit === unit)).length
+    });
 
     return {
       success: true,
       discoveredUnits: uniqueUnits
     };
   } catch (error) {
-    console.error('[Excel Handler] Error re-scanning file for units:', error);
-    return { success: false, message: error.message };
+    logger.logError('[Excel Handler] Error re-scanning file for units', error);
+    return createErrorResponse(error, 'rescanFileForUnits');
   }
 }
 

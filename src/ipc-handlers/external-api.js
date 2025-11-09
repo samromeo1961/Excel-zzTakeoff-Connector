@@ -1,4 +1,7 @@
 const axios = require('axios');
+const logger = require('../utils/logger');
+const { createErrorResponse } = require('../utils/error-handler');
+const { validateString, validateObject } = require('../utils/validators');
 
 /**
  * Whitelist of allowed domains for HTTP requests
@@ -47,7 +50,7 @@ function validateUrl(url) {
   );
 
   if (!isAllowed) {
-    console.error('[HTTP] Blocked request to non-whitelisted domain:', urlObj.hostname);
+    logger.logSecurity('Blocked request to non-whitelisted domain', { hostname: urlObj.hostname, allowedDomains: ALLOWED_DOMAINS });
     throw new Error(`Domain "${urlObj.hostname}" is not whitelisted. Allowed domains: ${ALLOWED_DOMAINS.join(', ')}`);
   }
 
@@ -71,11 +74,11 @@ function validateUrl(url) {
   );
 
   if (isPrivate) {
-    console.error('[HTTP] Blocked request to private IP/hostname:', hostname);
+    logger.logSecurity('Blocked request to private IP/hostname', { hostname });
     throw new Error('Cannot access internal/private resources');
   }
 
-  console.log('[HTTP] URL validation passed:', url);
+  logger.logDebug('[HTTP] URL validation passed', { url });
   return true;
 }
 
@@ -124,13 +127,20 @@ function validateHeaders(headers) {
  */
 async function sendToZzTakeoff(event, data) {
   try {
-    const { projectId, items } = data;
+    const validated = validateObject(data, 'data', { required: true });
+    const { projectId, items } = validated;
+
+    // Validate required fields
+    validateString(projectId, 'projectId', { required: true, minLength: 1 });
 
     // For now, return sample success response
     // TODO: Replace with actual API call when zzTakeoff API is available
 
-    console.log(`[DEMO] Would send ${items.length} item(s) to project ${projectId}`);
-    console.log('[DEMO] Items:', JSON.stringify(items, null, 2));
+    logger.logInfo('[External API] Sending items to zzTakeoff (demo mode)', {
+      projectId,
+      itemCount: items?.length || 0
+    });
+    logger.logDebug('[External API] Items to send', { items });
 
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -172,11 +182,9 @@ async function sendToZzTakeoff(event, data) {
     */
 
   } catch (err) {
-    console.error('Error sending to zzTakeoff:', err);
+    logger.logError('[External API] Error sending to zzTakeoff', err);
     return {
-      success: false,
-      error: 'Failed to send data to zzTakeoff',
-      message: err.message,
+      ...createErrorResponse(err, 'sendToZzTakeoff'),
       statusCode: err.response?.status
     };
   }
@@ -191,6 +199,8 @@ async function sendToZzTakeoff(event, data) {
  */
 async function getZzTakeoffProjects(event, data) {
   try {
+    logger.logInfo('[External API] Getting zzTakeoff projects (demo mode)');
+
     // For now, return sample projects similar to zzTakeoff's structure
     // TODO: Replace with actual API call when zzTakeoff API is available
 
@@ -278,11 +288,9 @@ async function getZzTakeoffProjects(event, data) {
     */
 
   } catch (err) {
-    console.error('Error fetching zzTakeoff projects:', err);
+    logger.logError('[External API] Error fetching zzTakeoff projects', err);
     return {
-      success: false,
-      error: 'Failed to fetch projects',
-      message: err.message,
+      ...createErrorResponse(err, 'getZzTakeoffProjects'),
       statusCode: err.response?.status
     };
   }
@@ -297,6 +305,8 @@ async function getZzTakeoffProjects(event, data) {
  */
 async function getZzTakeoffTakeoffTypes(event, data) {
   try {
+    logger.logInfo('[External API] Getting zzTakeoff takeoff types (demo mode)');
+
     // Sample takeoff types matching zzTakeoff's structure
     const sampleTakeoffTypes = [
       { id: 'area', name: 'Area' },
@@ -310,12 +320,8 @@ async function getZzTakeoffTakeoffTypes(event, data) {
       data: sampleTakeoffTypes
     };
   } catch (err) {
-    console.error('Error fetching zzTakeoff takeoff types:', err);
-    return {
-      success: false,
-      error: 'Failed to fetch takeoff types',
-      message: err.message
-    };
+    logger.logError('[External API] Error fetching zzTakeoff takeoff types', err);
+    return createErrorResponse(err, 'getZzTakeoffTakeoffTypes');
   }
 }
 
@@ -328,6 +334,8 @@ async function getZzTakeoffTakeoffTypes(event, data) {
  */
 async function getZzTakeoffCostTypes(event, data) {
   try {
+    logger.logInfo('[External API] Getting zzTakeoff cost types (demo mode)');
+
     // Sample cost types matching zzTakeoff's structure
     const sampleCostTypes = [
       { id: 'material', name: 'Material' },
@@ -341,12 +349,8 @@ async function getZzTakeoffCostTypes(event, data) {
       data: sampleCostTypes
     };
   } catch (err) {
-    console.error('Error fetching zzTakeoff cost types:', err);
-    return {
-      success: false,
-      error: 'Failed to fetch cost types',
-      message: err.message
-    };
+    logger.logError('[External API] Error fetching zzTakeoff cost types', err);
+    return createErrorResponse(err, 'getZzTakeoffCostTypes');
   }
 }
 
@@ -362,9 +366,11 @@ async function getZzTakeoffCostTypes(event, data) {
  */
 async function makeHttpRequest(event, config) {
   try {
-    const { method, url, data, headers, timeout = 15000 } = config;
+    const validated = validateObject(config, 'config', { required: true });
+    const { method, url, data, headers, timeout = 15000 } = validated;
 
     // SECURITY: Validate URL before making request
+    validateString(url, 'url', { required: true, minLength: 1 });
     validateUrl(url);
 
     // SECURITY: Validate headers
@@ -382,7 +388,7 @@ async function makeHttpRequest(event, config) {
       throw new Error(`HTTP method "${httpMethod}" is not allowed`);
     }
 
-    console.log(`[HTTP] Making ${httpMethod} request to ${url}`);
+    logger.logInfo('[External API] Making HTTP request', { method: httpMethod, url });
 
     const response = await axios({
       method: httpMethod,
@@ -394,6 +400,12 @@ async function makeHttpRequest(event, config) {
       validateStatus: null  // Don't throw on any status code
     });
 
+    logger.logInfo('[External API] HTTP request completed', {
+      method: httpMethod,
+      url,
+      status: response.status
+    });
+
     return {
       success: true,
       status: response.status,
@@ -402,11 +414,9 @@ async function makeHttpRequest(event, config) {
     };
 
   } catch (err) {
-    console.error('[HTTP] Request error:', err.message);
+    logger.logError('[External API] HTTP request error', err);
     return {
-      success: false,
-      error: 'HTTP request failed',
-      message: err.message,
+      ...createErrorResponse(err, 'makeHttpRequest'),
       status: err.response?.status,
       data: err.response?.data
     };
