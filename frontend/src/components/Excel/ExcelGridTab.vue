@@ -1333,11 +1333,17 @@ const loadExcelFile = async (filePath) => {
 
     loadingMessage.value = 'Loading preferences...';
 
-    // Load preferences (including column mappings and default markup %)
+    // Load preferences for default markup %
     const prefsResult = await api.preferencesStore.get();
     const preferences = prefsResult?.data || {};
-    const columnMappingsData = preferences.columnMappings || { preferredColumns: [] };
     const defaultMarkupPercent = preferences.defaultMarkupPercent;
+
+    // Load FILE-SPECIFIC column mappings for this file
+    const columnMappingsResult = await api.preferencesStore.getCombinedColumnMappings(filePath);
+    const columnMappingsData = columnMappingsResult?.data || { preferredColumns: [] };
+
+    console.log('[ExcelGrid] Loaded file-specific column mappings for:', filePath);
+    console.log('[ExcelGrid] Column mappings:', columnMappingsData);
 
     loadingMessage.value = 'Loading sheet list...';
 
