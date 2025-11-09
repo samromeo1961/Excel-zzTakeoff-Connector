@@ -23,7 +23,7 @@ Download the installer for Windows:
 3. **Click "Run anyway"** to proceed with installation
 4. **Click "Yes"** on the User Account Control (UAC) prompt
 
-**Detailed installation instructions with screenshots:** [View Beta Testing Guide](https://raw.githubusercontent.com/samromeo1961/Excel-zzTakeoff-Connector/master/BETA_TESTING_GUIDE.html) *(Right-click → Save As, then open in browser)*
+**Detailed installation instructions with screenshots:** [View Beta Testing Guide](https://samromeo1961.github.io/Excel-zzTakeoff-Connector/BETA_TESTING_GUIDE.html)
 
 ---
 
@@ -123,7 +123,7 @@ Download the installer for Windows:
 4. **Select shortcuts** (Desktop and Start Menu recommended)
 5. **Complete installation** and launch
 
-**Full installation guide with screenshots:** [BETA_TESTING_GUIDE.html](https://raw.githubusercontent.com/samromeo1961/Excel-zzTakeoff-Connector/master/BETA_TESTING_GUIDE.html)
+**Full installation guide with screenshots:** [BETA_TESTING_GUIDE.html](https://samromeo1961.github.io/Excel-zzTakeoff-Connector/BETA_TESTING_GUIDE.html)
 
 ---
 

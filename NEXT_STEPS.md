@@ -57,14 +57,17 @@ certutil -hashfile "dist\XLx Connector Setup 1.0.0.exe" SHA256
 
 ### 4. Host Beta Testing Guide
 
-Option A: **GitHub Pages**
-1. Enable GitHub Pages in repository settings
-2. Set source to `master` branch
-3. Guide will be available at: `https://samromeo1961.github.io/Excel-zzTakeoff-Connector/BETA_TESTING_GUIDE.html`
+**GitHub Pages** (Recommended - renders HTML directly in browser)
+1. Go to repository Settings → Pages
+2. Under "Source", select "Deploy from a branch"
+3. Select branch: `master` and folder: `/root`
+4. Click Save
+5. Wait a few minutes for deployment
+6. Guide will be available at: `https://samromeo1961.github.io/Excel-zzTakeoff-Connector/BETA_TESTING_GUIDE.html`
 
-Option B: **GitHub Raw URL** (simpler, already configured)
+**Alternative: GitHub Raw URL** (requires download)
 - Direct link: `https://raw.githubusercontent.com/samromeo1961/Excel-zzTakeoff-Connector/master/BETA_TESTING_GUIDE.html`
-- Beta testers can download and open locally
+- Beta testers must download and open locally
 
 ### 5. Create GitHub Release Description
 
@@ -79,7 +82,7 @@ Thank you for participating in the beta test!
 
 **⚠️ This is an UNSIGNED application** - Windows will show security warnings. This is normal for beta releases.
 
-**[📖 Read the Installation Guide First](https://raw.githubusercontent.com/samromeo1961/Excel-zzTakeoff-Connector/master/BETA_TESTING_GUIDE.html)** *(Right-click → Save As → Open in browser)*
+**[📖 Read the Installation Guide First](https://samromeo1961.github.io/Excel-zzTakeoff-Connector/BETA_TESTING_GUIDE.html)**
 
 ### Quick Install
 
@@ -117,7 +120,7 @@ Found a bug? [Create an issue](https://github.com/samromeo1961/Excel-zzTakeoff-C
 Share these links with your beta testers:
 
 1. **Release page:** `https://github.com/samromeo1961/Excel-zzTakeoff-Connector/releases/tag/v1.0.0`
-2. **Installation guide:** `https://raw.githubusercontent.com/samromeo1961/Excel-zzTakeoff-Connector/master/BETA_TESTING_GUIDE.html`
+2. **Installation guide:** `https://samromeo1961.github.io/Excel-zzTakeoff-Connector/BETA_TESTING_GUIDE.html`
 3. **Issue tracker:** `https://github.com/samromeo1961/Excel-zzTakeoff-Connector/issues`
 
 ### 7. Monitor Beta Testing
