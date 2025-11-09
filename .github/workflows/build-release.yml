@@ -22,10 +22,12 @@ jobs:
         run: npm install
 
       - name: Install frontend dependencies
-        run: cd frontend && npm install
+        run: npm install
+        working-directory: ./frontend
 
       - name: Build frontend
-        run: npm run build-frontend
+        run: npm run build
+        working-directory: ./frontend
 
       - name: Build Windows installer
         run: npx electron-builder --win
@@ -54,10 +56,12 @@ jobs:
         run: npm install
 
       - name: Install frontend dependencies
-        run: cd frontend && npm install
+        run: npm install
+        working-directory: ./frontend
 
       - name: Build frontend
-        run: npm run build-frontend
+        run: npm run build
+        working-directory: ./frontend
 
       - name: Build macOS installer
         run: npx electron-builder --mac
@@ -89,10 +93,12 @@ jobs:
         run: npm install
 
       - name: Install frontend dependencies
-        run: cd frontend && npm install
+        run: npm install
+        working-directory: ./frontend
 
       - name: Build frontend
-        run: npm run build-frontend
+        run: npm run build
+        working-directory: ./frontend
 
       - name: Build Linux installer
         run: npx electron-builder --linux
