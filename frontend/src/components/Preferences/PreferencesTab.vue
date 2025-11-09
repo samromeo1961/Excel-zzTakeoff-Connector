@@ -863,16 +863,8 @@ const saveAndReloadGrid = async () => {
       return;
     }
 
-    // Reset column mappings to defaults to force re-scan with new smart matching rules
-    console.log('[Preferences] Resetting column mappings to force re-scan...');
-    await api.preferencesStore.resetColumnMappings();
-
-    // Clear discovered columns to allow fresh discovery
-    await api.preferencesStore.clearDiscoveredColumns();
-
-    // Reload column mappings
-    await loadColumnMappings();
-    await loadDiscoveredColumns();
+    // NOTE: We do NOT reset global column mappings here - that would clear user's "Excel Column" selections
+    // We only clear FILE-SPECIFIC visibility settings via the custom event below
 
     // Navigate to Excel Grid tab
     await router.push('/excel');
@@ -880,12 +872,12 @@ const saveAndReloadGrid = async () => {
     // Wait for navigation to complete
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Dispatch event to force grid reload with re-scan
+    // Dispatch event to force grid reload (will respect existing column mappings)
     window.dispatchEvent(new CustomEvent('force-grid-reload', {
-      detail: { rescan: true }
+      detail: { rescan: false } // Don't rescan - keep existing column mappings
     }));
 
-    alert('Preferences applied! Column mappings have been reset and the grid will reload with updated smart matching.');
+    alert('Preferences applied! The grid will reload with updated settings.');
   } catch (error) {
     console.error('[Preferences] Error saving and reloading:', error);
     alert(`Error: ${error.message}`);

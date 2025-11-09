@@ -30,7 +30,8 @@ export default function useElectronAPI() {
       updateRow: (filePath, sheetName, rowId, updates) => window.electronAPI?.excel.updateRow(filePath, sheetName, rowId, updates),
       getSheetList: (filePath) => window.electronAPI?.excel.getSheetList(filePath),
       closeFile: (filePath) => window.electronAPI?.excel.closeFile(filePath),
-      rescanUnits: (filePath) => window.electronAPI?.excel.rescanUnits(filePath)
+      rescanUnits: (filePath) => window.electronAPI?.excel.rescanUnits(filePath),
+      getFileStats: (filePath) => window.electronAPI?.excel.getFileStats(filePath)
     },
     // Database operations
     db: {

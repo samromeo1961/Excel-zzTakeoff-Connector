@@ -28,13 +28,13 @@
     "axios": "^1.6.0",
     "electron-store": "^8.2.0",
     "sql.js": "^1.13.0",
-    "uuid": "^13.0.0",
+    "uuid": "^9.0.1",
     "winston": "^3.18.3",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
-    "electron": "^39.0.0",
+    "electron": "^33.2.1",
     "electron-builder": "^26.0.12",
     "wait-on": "^9.0.1"
   },

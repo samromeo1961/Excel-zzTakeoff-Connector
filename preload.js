@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, shell } = require('electron');
 
 /**
  * Preload script to safely expose IPC functions to the renderer process
@@ -24,7 +24,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     updateRow: (filePath, sheetName, rowId, updates) => ipcRenderer.invoke('excel:update-row', { filePath, sheetName, rowId, updates }),
     getSheetList: (filePath) => ipcRenderer.invoke('excel:get-sheet-list', filePath),
     closeFile: (filePath) => ipcRenderer.invoke('excel:close-file', filePath),
-    rescanUnits: (filePath) => ipcRenderer.invoke('excel:rescan-units', filePath)
+    rescanUnits: (filePath) => ipcRenderer.invoke('excel:rescan-units', filePath),
+    getFileStats: (filePath) => ipcRenderer.invoke('excel:get-file-stats', filePath)
   },
 
   // External API calls (for zzTakeoff integration)
@@ -131,5 +132,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onMenuOpenRecentFile: (callback) => ipcRenderer.on('menu:open-recent-file', (event, filePath) => callback(filePath)),
 
   // Menu update
-  updateMenu: () => ipcRenderer.invoke('menu:update')
+  updateMenu: () => ipcRenderer.invoke('menu:update'),
+
+  // Shell operations
+  shell: {
+    openPath: (path) => shell.openPath(path)
+  }
 });

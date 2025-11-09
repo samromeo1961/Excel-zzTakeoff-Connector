@@ -431,6 +431,7 @@ ipcMain.handle('excel:update-row', excelHandlers.updateSheetRow);
 ipcMain.handle('excel:get-sheet-list', excelHandlers.getSheetList);
 ipcMain.handle('excel:close-file', excelHandlers.closeFile);
 ipcMain.handle('excel:rescan-units', excelHandlers.rescanFileForUnits);
+ipcMain.handle('excel:get-file-stats', excelHandlers.getFileStats);
 
 // ============================================================
 // IPC Handlers for External APIs (zzTakeoff)
