@@ -219,6 +219,7 @@
     <SheetPickerModal
       :visible="showSheetPickerModal"
       :sheets="pendingFileLoad?.sheets || []"
+      :defaultSheetName="pendingFileLoad?.lastOpenedSheet || null"
       @close="handleSheetPickerClose"
       @select="handleSheetSelection"
     />
@@ -1739,14 +1740,14 @@ const loadExcelFile = async (filePath) => {
       throw new Error('No sheets found in Excel file');
     }
 
-    // Check if we have a last opened sheet for this file (reopening scenario)
+    // Check if we have a last opened sheet for this file (for pre-selection in picker)
     let lastOpenedSheet = null;
     try {
       const sheetPrefKey = `lastOpenedSheet:${filePath}`;
       const sheetPrefResult = await api.preferencesStore.get(sheetPrefKey);
       lastOpenedSheet = sheetPrefResult?.data?.[sheetPrefKey];
       if (lastOpenedSheet) {
-        console.log('[ExcelGrid] Found last opened sheet:', lastOpenedSheet);
+        console.log('[ExcelGrid] Found last opened sheet for pre-selection:', lastOpenedSheet);
       }
     } catch (err) {
       console.warn('[ExcelGrid] Could not retrieve last opened sheet:', err);
@@ -1755,22 +1756,7 @@ const loadExcelFile = async (filePath) => {
     // Check if there are multiple sheets
     const visibleSheets = sheetListResult.sheets.filter(s => !s.hidden);
 
-    // If we have a last opened sheet and it exists in the current file, use it automatically
-    if (lastOpenedSheet && sheetListResult.sheets.find(s => s.name === lastOpenedSheet)) {
-      console.log('[ExcelGrid] Reopening file - auto-selecting last opened sheet:', lastOpenedSheet);
-
-      // Continue loading with the last opened sheet (no modal)
-      await continueFileLoad({
-        filePath,
-        result,
-        metadataResult,
-        columnMappingsData,
-        sheetListResult
-      }, lastOpenedSheet);
-      return;
-    }
-
-    // New file opening - check if multiple sheets to show picker
+    // Check if multiple sheets to show picker
     if (visibleSheets.length > 1) {
       // Store the data needed to continue loading after sheet selection
       pendingFileLoad.value = {
@@ -1779,6 +1765,7 @@ const loadExcelFile = async (filePath) => {
         metadataResult,
         columnMappingsData,
         sheetListResult,
+        lastOpenedSheet, // Pass last opened sheet for pre-selection
         sheets: sheetListResult.sheets.map(s => ({
           name: s.name,
           rowCount: s.rowCount,

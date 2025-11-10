@@ -91,6 +91,10 @@ const props = defineProps({
     type: Array,
     required: true,
     // Each sheet: { name, rowCount, hidden }
+  },
+  defaultSheetName: {
+    type: String,
+    default: null
   }
 });
 
@@ -104,7 +108,16 @@ const showHiddenSheets = ref(false);
 watch(() => props.visible, (newVal) => {
   isVisible.value = newVal;
   if (newVal) {
-    // Auto-select first visible sheet when opening
+    // Try to pre-select the default sheet (last opened), otherwise first visible sheet
+    if (props.defaultSheetName) {
+      const defaultSheet = props.sheets.find(s => s.name === props.defaultSheetName);
+      if (defaultSheet) {
+        selectedSheet.value = defaultSheet;
+        console.log('[SheetPicker] Pre-selected last opened sheet:', defaultSheet.name);
+        return;
+      }
+    }
+    // Fallback: Auto-select first visible sheet when opening
     const firstVisible = props.sheets.find(s => !s.hidden);
     selectedSheet.value = firstVisible || props.sheets[0] || null;
   } else {
