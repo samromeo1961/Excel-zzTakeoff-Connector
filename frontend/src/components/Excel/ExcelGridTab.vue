@@ -1709,6 +1709,7 @@ const loadExcelFile = async (filePath) => {
       fileSize: fileStats.fileSize,
       rowCount: fileStats.rowCount,
       sheetCount: fileStats.sheetCount || availableSheets.value.length,
+      sheetName: currentSheetName.value, // Add the current sheet name
       dateCreated: fileStats.dateCreated,
       dateModified: fileStats.dateModified
     });
