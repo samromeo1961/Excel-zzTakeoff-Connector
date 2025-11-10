@@ -150,7 +150,7 @@ const confirmSelection = () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -168,10 +168,11 @@ const confirmSelection = () => {
 .modal-content {
   background: var(--bs-body-bg);
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
   max-height: 80vh;
+  border: 1px solid var(--bs-border-color);
 }
 
 .modal-header {
@@ -197,6 +198,7 @@ const confirmSelection = () => {
   font-size: 1.5rem;
   cursor: pointer;
   opacity: 0.5;
+  color: var(--bs-body-color);
 }
 
 .btn-close:hover {
@@ -207,6 +209,7 @@ const confirmSelection = () => {
   content: '×';
   font-size: 2rem;
   line-height: 1;
+  color: var(--bs-body-color);
 }
 
 .modal-body {
@@ -265,6 +268,11 @@ const confirmSelection = () => {
 .sheet-meta {
   font-size: 0.85rem;
   margin-left: 1.75rem;
+  color: var(--bs-secondary-color);
+}
+
+.text-muted {
+  color: var(--bs-secondary-color) !important;
 }
 
 .sheet-actions {
@@ -338,5 +346,20 @@ const confirmSelection = () => {
 .badge {
   font-size: 0.7rem;
   padding: 0.25rem 0.5rem;
+}
+
+.bg-secondary {
+  background-color: var(--bs-secondary) !important;
+  color: white !important;
+}
+
+/* Icon colors for dark mode */
+.bi {
+  color: var(--bs-body-color);
+}
+
+.text-primary .bi,
+.bi.text-primary {
+  color: var(--bs-primary) !important;
 }
 </style>

@@ -571,6 +571,17 @@ const onSheetChange = async () => {
   // Update total row count
   totalRowCount.value = selectedSheet.rowCount;
 
+  // Save the selected sheet as last opened for this file
+  if (currentFile.value) {
+    try {
+      const sheetPrefKey = `lastOpenedSheet:${currentFile.value}`;
+      await api.preferencesStore.update({ key: sheetPrefKey, value: currentSheetName.value });
+      console.log('[ExcelGrid] Saved last opened sheet:', currentSheetName.value);
+    } catch (err) {
+      console.warn('[ExcelGrid] Failed to save last opened sheet:', err);
+    }
+  }
+
   // Load data for the new sheet
   await loadSheetData();
 
@@ -1426,6 +1437,15 @@ const continueFileLoad = async (pendingData, selectedSheetName) => {
     availableSheets.value = sheetListResult.sheets;
     currentSheetName.value = selectedSheetName;
 
+    // Save the selected sheet as last opened for this file
+    try {
+      const sheetPrefKey = `lastOpenedSheet:${filePath}`;
+      await api.preferencesStore.update({ key: sheetPrefKey, value: selectedSheetName });
+      console.log('[ExcelGrid] Saved last opened sheet:', selectedSheetName);
+    } catch (err) {
+      console.warn('[ExcelGrid] Failed to save last opened sheet:', err);
+    }
+
     // Find the selected sheet
     const sheet = sheetListResult.sheets.find(s => s.name === selectedSheetName);
     if (!sheet) {
@@ -1719,8 +1739,38 @@ const loadExcelFile = async (filePath) => {
       throw new Error('No sheets found in Excel file');
     }
 
-    // Check if there are multiple sheets - if so, show sheet picker
+    // Check if we have a last opened sheet for this file (reopening scenario)
+    let lastOpenedSheet = null;
+    try {
+      const sheetPrefKey = `lastOpenedSheet:${filePath}`;
+      const sheetPrefResult = await api.preferencesStore.get(sheetPrefKey);
+      lastOpenedSheet = sheetPrefResult?.data?.[sheetPrefKey];
+      if (lastOpenedSheet) {
+        console.log('[ExcelGrid] Found last opened sheet:', lastOpenedSheet);
+      }
+    } catch (err) {
+      console.warn('[ExcelGrid] Could not retrieve last opened sheet:', err);
+    }
+
+    // Check if there are multiple sheets
     const visibleSheets = sheetListResult.sheets.filter(s => !s.hidden);
+
+    // If we have a last opened sheet and it exists in the current file, use it automatically
+    if (lastOpenedSheet && sheetListResult.sheets.find(s => s.name === lastOpenedSheet)) {
+      console.log('[ExcelGrid] Reopening file - auto-selecting last opened sheet:', lastOpenedSheet);
+
+      // Continue loading with the last opened sheet (no modal)
+      await continueFileLoad({
+        filePath,
+        result,
+        metadataResult,
+        columnMappingsData,
+        sheetListResult
+      }, lastOpenedSheet);
+      return;
+    }
+
+    // New file opening - check if multiple sheets to show picker
     if (visibleSheets.length > 1) {
       // Store the data needed to continue loading after sheet selection
       pendingFileLoad.value = {
