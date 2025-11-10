@@ -778,11 +778,11 @@ const componentParent = {
 
 /* File path text styling - ensure visibility */
 .ag-grid-container .text-muted {
-  color: #6c757d !important;
+  color: #ffffff !important;
 }
 
 .ag-grid-container .text-muted.small {
-  color: #6c757d !important;
+  color: #ffffff !important;
 }
 
 /* Dark mode file path text - white to match other grid text */
