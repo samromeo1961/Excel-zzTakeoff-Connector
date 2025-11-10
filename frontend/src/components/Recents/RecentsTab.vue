@@ -330,13 +330,17 @@ const columnDefs = ref([
   {
     headerName: 'File Size',
     field: 'fileSize',
-    width: 120,
+    flex: 1,
+    minWidth: 90,
+    maxWidth: 120,
     valueFormatter: (params) => formatFileSize(params.value)
   },
   {
     headerName: 'Rows',
     field: 'rowCount',
-    width: 100,
+    flex: 1,
+    minWidth: 80,
+    maxWidth: 100,
     valueFormatter: (params) => {
       if (params.value === null || params.value === undefined) return '-';
       return params.value.toLocaleString();
@@ -345,7 +349,9 @@ const columnDefs = ref([
   {
     headerName: 'Sheets',
     field: 'sheetName',
-    width: 150,
+    flex: 1,
+    minWidth: 100,
+    maxWidth: 150,
     valueFormatter: (params) => {
       if (!params.value || params.value === '') return '-';
       return params.value;
@@ -354,7 +360,9 @@ const columnDefs = ref([
   {
     headerName: 'Last Opened',
     field: 'lastOpened',
-    width: 180,
+    flex: 1,
+    minWidth: 140,
+    maxWidth: 180,
     sort: 'desc',
     valueFormatter: (params) => formatRelativeTime(params.value),
     tooltipValueGetter: (params) => formatDate(params.value)
@@ -362,20 +370,24 @@ const columnDefs = ref([
   {
     headerName: 'Date Created',
     field: 'dateCreated',
-    width: 180,
+    flex: 1,
+    minWidth: 140,
+    maxWidth: 180,
     valueFormatter: (params) => formatDate(params.value)
   },
   {
     headerName: 'Date Modified',
     field: 'dateModified',
-    width: 180,
+    flex: 1,
+    minWidth: 140,
+    maxWidth: 180,
     valueFormatter: (params) => formatDate(params.value)
   },
   {
     headerName: 'File Path',
     field: 'filePath',
-    flex: 1,
-    minWidth: 300,
+    flex: 2,
+    minWidth: 250,
     cellClass: 'text-muted small',
     cellRenderer: FilePathCellRenderer
   },
@@ -573,6 +585,14 @@ const refreshGrid = () => {
 // Event handlers for cleanup
 let visibilityHandler = null;
 let routerUnwatch = null;
+let resizeHandler = null;
+
+// Handle window resize - refit columns
+const handleWindowResize = () => {
+  if (gridApi.value) {
+    gridApi.value.sizeColumnsToFit();
+  }
+};
 
 // Load on mount and refresh grid when becoming visible
 onMounted(() => {
@@ -597,6 +617,10 @@ onMounted(() => {
       }, 100);
     }
   });
+
+  // Add window resize listener to adjust columns
+  resizeHandler = handleWindowResize;
+  window.addEventListener('resize', resizeHandler);
 });
 
 // Cleanup on unmount
@@ -606,6 +630,9 @@ onBeforeUnmount(() => {
   }
   if (routerUnwatch) {
     routerUnwatch();
+  }
+  if (resizeHandler) {
+    window.removeEventListener('resize', resizeHandler);
   }
 });
 
