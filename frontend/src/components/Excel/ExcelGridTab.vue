@@ -215,6 +215,13 @@
       @close="showColumnPicker = false"
       @apply="handleColumnChanges"
     />
+
+    <SheetPickerModal
+      :visible="showSheetPickerModal"
+      :sheets="pendingFileLoad?.sheets || []"
+      @close="handleSheetPickerClose"
+      @select="handleSheetSelection"
+    />
   </div>
 </template>
 
@@ -225,6 +232,7 @@ import { AgGridVue } from 'ag-grid-vue3';
 import SendToTemplateModal from '../Modals/SendToTemplateModal.vue';
 import UpdateTemplateModal from '../Modals/UpdateTemplateModal.vue';
 import ColumnPickerModal from './ColumnPickerModal.vue';
+import SheetPickerModal from './SheetPickerModal.vue';
 import TabToolbar from '../common/TabToolbar.vue';
 import useElectronAPI from '../../composables/useElectronAPI';
 
@@ -337,6 +345,8 @@ const columnMappings = ref(null);
 const showSendToTemplateModal = ref(false);
 const showUpdateTemplateModal = ref(false);
 const showColumnPicker = ref(false);
+const showSheetPickerModal = ref(false);
+const pendingFileLoad = ref(null); // Stores file data while waiting for sheet selection
 const selectedRows = ref([]);
 const selectedRowsCount = ref(0);
 
@@ -883,6 +893,28 @@ const handleColumnChanges = (updatedColumns) => {
   console.log('[ExcelGrid] Column changes saved to session');
 };
 
+// Handle sheet picker close
+const handleSheetPickerClose = () => {
+  showSheetPickerModal.value = false;
+  pendingFileLoad.value = null;
+};
+
+// Handle sheet selection from picker
+const handleSheetSelection = async (selectedSheet) => {
+  console.log('[ExcelGrid] Sheet selected:', selectedSheet.name);
+
+  if (!pendingFileLoad.value) {
+    console.error('[ExcelGrid] No pending file load data');
+    return;
+  }
+
+  // Continue loading the file with the selected sheet
+  await continueFileLoad(pendingFileLoad.value, selectedSheet.name);
+
+  // Clear pending state
+  pendingFileLoad.value = null;
+};
+
 // zzType dropdown options
 const zzTypeOptions = [
   { value: '', label: '-- Select Type --' },
@@ -1382,99 +1414,25 @@ const openFile = async () => {
   }
 };
 
-// Load Excel file
-const loadExcelFile = async (filePath) => {
+// Continue file load after sheet selection
+const continueFileLoad = async (pendingData, selectedSheetName) => {
   try {
     loading.value = true;
-    loadingMessage.value = 'Reading Excel file...';
+    loadingMessage.value = 'Loading selected sheet...';
 
-    // Close the old file if one is currently open
-    if (currentFile.value && currentFile.value !== filePath) {
-      console.log('[ExcelGrid] Closing previous file:', currentFile.value);
-      loadingMessage.value = 'Closing previous file...';
+    const { filePath, result, metadataResult, columnMappingsData, sheetListResult } = pendingData;
 
-      // Clear session storage for the old file
-      try {
-        sessionStorage.removeItem(`excelGrid_${currentFile.value}`);
-        console.log('[ExcelGrid] Cleared session storage for previous file');
-      } catch (err) {
-        console.warn('[ExcelGrid] Failed to clear session storage:', err);
-      }
-
-      // Close the file in the backend
-      try {
-        await api.excel.closeFile(currentFile.value);
-      } catch (err) {
-        console.warn('[ExcelGrid] Failed to close previous file:', err);
-      }
-
-      // Clear grid data
-      rowData.value = [];
-      columnDefs.value = [];
-      selectedRows.value = [];
-      metadata.value = {};
-      console.log('[ExcelGrid] Cleared grid state');
-    }
-
-    // Read Excel file (now returns metadata only - data is in SQLite)
-    const result = await api.excel.readFile(filePath);
-    if (!result.success) {
-      throw new Error(result.message || 'Failed to read Excel file');
-    }
-
-    // Check if this was a cache hit or cache miss
-    if (result.cached === true) {
-      console.log('✅ CACHE HIT: File loaded from cache in <200ms');
-      loadingMessage.value = 'Loading from cache (fast)...';
-    } else {
-      console.log('❌ CACHE MISS: Full Excel parse performed');
-      loadingMessage.value = 'Reading Excel file (first time)...';
-    }
-
-    // Store file info
-    currentFile.value = result.filePath;
-    currentFileName.value = result.filePath.split(/[\\/]/).pop();
-
-    loadingMessage.value = 'Loading metadata...';
-
-    // Load metadata from hidden sheet
-    const metadataResult = await api.excel.getMetadata(filePath);
-    if (metadataResult.success) {
-      metadata.value = metadataResult.metadata || {};
-    }
-
-    loadingMessage.value = 'Loading preferences...';
-
-    // Load preferences for default markup %
-    const prefsResult = await api.preferencesStore.get();
-    const preferences = prefsResult?.data || {};
-    const defaultMarkupPercent = preferences.defaultMarkupPercent;
-
-    // Load FILE-SPECIFIC column mappings for this file
-    const columnMappingsResult = await api.preferencesStore.getCombinedColumnMappings(filePath);
-    const columnMappingsData = columnMappingsResult?.data || { preferredColumns: [] };
-
-    console.log('[ExcelGrid] Loaded file-specific column mappings for:', filePath);
-    console.log('[ExcelGrid] Column mappings:', columnMappingsData);
-
-    loadingMessage.value = 'Loading sheet list...';
-
-    // Get sheet list from SQLite
-    const sheetListResult = await api.excel.getSheetList(filePath);
-    if (!sheetListResult.success || !sheetListResult.sheets || sheetListResult.sheets.length === 0) {
-      throw new Error('No sheets found in Excel file');
-    }
-
-    // Set available sheets and select first sheet
+    // Set available sheets and select the chosen sheet
     availableSheets.value = sheetListResult.sheets;
-    currentSheetName.value = sheetListResult.sheets[0].name;
-    totalRowCount.value = sheetListResult.sheets[0].rowCount;
+    currentSheetName.value = selectedSheetName;
 
-    // Get first sheet metadata
-    const sheet = sheetListResult.sheets[0];
+    // Find the selected sheet
+    const sheet = sheetListResult.sheets.find(s => s.name === selectedSheetName);
     if (!sheet) {
-      throw new Error('No sheets found in Excel file');
+      throw new Error(`Sheet "${selectedSheetName}" not found`);
     }
+
+    totalRowCount.value = sheet.rowCount;
 
     console.log('Sheet columns from SQLite:', sheet.columns);
     console.log('Column mappings:', columnMappingsData);
@@ -1567,84 +1525,26 @@ const loadExcelFile = async (filePath) => {
     cols.push({
       field: '_markupPercent',
       headerName: 'Markup %',
-      width: 120,
-      maxWidth: 120,
+      width: 140,
+      maxWidth: 140,
       editable: true,
-      singleClickEdit: true,
-      cellEditor: MarkupPercentEditor,
-      cellEditorPopup: false,
+      cellEditor: 'agNumberCellEditor',
+      cellEditorParams: {
+        min: 0,
+        max: 100,
+        precision: 2
+      },
+      cellClass: 'markup-cell',
       pinned: 'right',
       suppressSizeToFit: true,
-      cellClass: 'markup-cell',
-      cellStyle: (params) => {
-        // Apply styling if markup was manually edited
-        const isManual = params.data && params.data._markupManuallySet === true;
-
-        if (isManual) {
-          // Check if dark mode
-          const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-
-          if (isDark) {
-            // Dark mode: bright cyan background with white text
-            return {
-              backgroundColor: '#006d7a',
-              color: '#ffffff',
-              fontWeight: '700',
-              fontStyle: 'italic',
-              overflow: 'visible',
-              textOverflow: 'clip',
-              whiteSpace: 'nowrap',
-              display: 'flex',
-              alignItems: 'center',
-              paddingLeft: '8px',
-              paddingRight: '8px'
-            };
-          } else {
-            // Light mode: bright yellow background with black text
-            return {
-              backgroundColor: '#fff9c4',
-              color: '#000000',
-              fontWeight: '700',
-              fontStyle: 'italic',
-              overflow: 'visible',
-              textOverflow: 'clip',
-              whiteSpace: 'nowrap',
-              display: 'flex',
-              alignItems: 'center',
-              paddingLeft: '8px',
-              paddingRight: '8px'
-            };
-          }
-        }
-        return null;
-      },
       valueFormatter: (params) => {
-        if (params.value === null || params.value === undefined || params.value === '') {
-          return '';
-        }
+        if (params.value === null || params.value === undefined) return '';
         return `${params.value}%`;
       },
       valueParser: (params) => {
-        const value = params.newValue;
-        if (value === null || value === undefined || value === '') {
-          return null;
-        }
-        const numericValue = parseFloat(String(value).replace('%', '').trim());
-        return isNaN(numericValue) ? null : numericValue;
+        const val = parseFloat(params.newValue);
+        return isNaN(val) ? null : val;
       }
-    });
-
-    // Add Cost Type column (metadata column - user can select)
-    cols.push({
-      field: '_costType',
-      headerName: 'Cost Type',
-      width: 140,
-      maxWidth: 140,
-      cellEditor: CostTypeEditor,
-      editable: true,
-      cellClass: 'cost-type-cell',
-      pinned: 'right',
-      suppressSizeToFit: true
     });
 
     // Add zzType column
@@ -1735,6 +1635,137 @@ const loadExcelFile = async (filePath) => {
     loading.value = false;
   }
 };
+
+// Load Excel file
+const loadExcelFile = async (filePath) => {
+  try {
+    loading.value = true;
+    loadingMessage.value = 'Reading Excel file...';
+
+    // Close the old file if one is currently open
+    if (currentFile.value && currentFile.value !== filePath) {
+      console.log('[ExcelGrid] Closing previous file:', currentFile.value);
+      loadingMessage.value = 'Closing previous file...';
+
+      // Clear session storage for the old file
+      try {
+        sessionStorage.removeItem(`excelGrid_${currentFile.value}`);
+        console.log('[ExcelGrid] Cleared session storage for previous file');
+      } catch (err) {
+        console.warn('[ExcelGrid] Failed to clear session storage:', err);
+      }
+
+      // Close the file in the backend
+      try {
+        await api.excel.closeFile(currentFile.value);
+      } catch (err) {
+        console.warn('[ExcelGrid] Failed to close previous file:', err);
+      }
+
+      // Clear grid data
+      rowData.value = [];
+      columnDefs.value = [];
+      selectedRows.value = [];
+      metadata.value = {};
+      console.log('[ExcelGrid] Cleared grid state');
+    }
+
+    // Read Excel file (now returns metadata only - data is in SQLite)
+    const result = await api.excel.readFile(filePath);
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to read Excel file');
+    }
+
+    // Check if this was a cache hit or cache miss
+    if (result.cached === true) {
+      console.log('✅ CACHE HIT: File loaded from cache in <200ms');
+      loadingMessage.value = 'Loading from cache (fast)...';
+    } else {
+      console.log('❌ CACHE MISS: Full Excel parse performed');
+      loadingMessage.value = 'Reading Excel file (first time)...';
+    }
+
+    // Store file info
+    currentFile.value = result.filePath;
+    currentFileName.value = result.filePath.split(/[\\/]/).pop();
+
+    loadingMessage.value = 'Loading metadata...';
+
+    // Load metadata from hidden sheet
+    const metadataResult = await api.excel.getMetadata(filePath);
+    if (metadataResult.success) {
+      metadata.value = metadataResult.metadata || {};
+    }
+
+    loadingMessage.value = 'Loading preferences...';
+
+    // Load preferences for default markup %
+    const prefsResult = await api.preferencesStore.get();
+    const preferences = prefsResult?.data || {};
+    const defaultMarkupPercent = preferences.defaultMarkupPercent;
+
+    // Load FILE-SPECIFIC column mappings for this file
+    const columnMappingsResult = await api.preferencesStore.getCombinedColumnMappings(filePath);
+    const columnMappingsData = columnMappingsResult?.data || { preferredColumns: [] };
+
+    console.log('[ExcelGrid] Loaded file-specific column mappings for:', filePath);
+    console.log('[ExcelGrid] Column mappings:', columnMappingsData);
+
+    loadingMessage.value = 'Loading sheet list...';
+
+    // Get sheet list from SQLite
+    const sheetListResult = await api.excel.getSheetList(filePath);
+    if (!sheetListResult.success || !sheetListResult.sheets || sheetListResult.sheets.length === 0) {
+      throw new Error('No sheets found in Excel file');
+    }
+
+    // Check if there are multiple sheets - if so, show sheet picker
+    const visibleSheets = sheetListResult.sheets.filter(s => !s.hidden);
+    if (visibleSheets.length > 1) {
+      // Store the data needed to continue loading after sheet selection
+      pendingFileLoad.value = {
+        filePath,
+        result,
+        metadataResult,
+        columnMappingsData,
+        sheetListResult,
+        sheets: sheetListResult.sheets.map(s => ({
+          name: s.name,
+          rowCount: s.rowCount,
+          hidden: s.hidden
+        }))
+      };
+
+      // Show the sheet picker modal
+      showSheetPickerModal.value = true;
+      loading.value = false; // Stop loading spinner while user selects
+
+      console.log('[ExcelGrid] Multiple sheets detected - showing sheet picker');
+      return; // Wait for user to select a sheet
+    }
+
+    // Single sheet or all hidden - continue with first available sheet
+    const selectedSheetName = sheetListResult.sheets[0].name;
+    console.log('[ExcelGrid] Single sheet detected - auto-selecting:', selectedSheetName);
+
+    // Continue loading with the first sheet
+    await continueFileLoad({
+      filePath,
+      result,
+      metadataResult,
+      columnMappingsData,
+      sheetListResult
+    }, selectedSheetName);
+
+  } catch (error) {
+    console.error('Error loading Excel file:', error);
+    alert(`Error loading Excel file: ${error.message}`);
+    currentFile.value = null;
+  } finally {
+    loading.value = false;
+  }
+};
+
 
 // Save file
 const saveFile = async () => {
