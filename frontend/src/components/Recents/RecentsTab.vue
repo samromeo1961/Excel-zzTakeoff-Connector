@@ -376,8 +376,14 @@ const columnDefs = ref([
     field: 'filePath',
     flex: 1,
     minWidth: 300,
-    cellClass: 'text-muted small',
-    cellRenderer: FilePathCellRenderer
+    cellRenderer: FilePathCellRenderer,
+    cellStyle: () => {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      return {
+        color: isDark ? '#adb5bd' : '#6c757d',
+        fontSize: '0.875rem'
+      };
+    }
   },
   {
     headerName: 'Actions',
