@@ -376,7 +376,8 @@ const columnDefs = ref([
     field: 'filePath',
     flex: 1,
     minWidth: 300,
-    cellClass: 'text-muted small',
+    cellClass: 'small',
+    cellStyle: { color: 'white' },
     cellRenderer: FilePathCellRenderer
   },
   {
