@@ -18,6 +18,7 @@ XLx Connector is a desktop application for Windows that enhances Excel spreadshe
 - **Smart Matching**: Automatically detects duplicate items by code/SKU
 
 ### zzTakeoff Integration
+- **Multi-Screen Support**: Open zzTakeoff in a separate window for dual-monitor workflows
 - **Direct Upload**: Send Excel items directly to zzTakeoff projects
 - **Flexible Mapping**: Configure which columns to send
 - **Cost Type Support**: Material, Labour, Plant, Subcontractor, Other
@@ -85,6 +86,13 @@ XLx Connector is a desktop application for Windows that enhances Excel spreadshe
 
 ## New in This Version
 
+### v1.1.0
+
+- ✨ **Multi-Screen Support**: zzTakeoff web interface now opens in a separate window that can be moved to a second monitor
+- ✨ **Improved Workflow**: Work with Excel data on one screen while using zzTakeoff on another
+- ✨ **Persistent Session**: zzTakeoff window maintains login state across tab switches
+- 🔧 **UI Cleanup**: Removed fullscreen buttons from all tabs for a cleaner interface
+
 ### v1.0.0-beta
 - ✨ **Auto-Reload**: Last opened file automatically loads on app startup
 - ✨ **Hover Tooltips**: Full text preview for truncated Description columns
@@ -146,5 +154,5 @@ This software is provided for beta testing purposes only and may not be redistri
 
 ---
 
-**Version**: 1.0.0-beta
-**Build Date**: 2025-11-08
+**Version**: 1.1.0
+**Build Date**: 2025-11-21

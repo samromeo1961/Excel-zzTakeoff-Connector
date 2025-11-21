@@ -14,8 +14,6 @@
         <div>
           <h4 class="mb-0">Preferences</h4>
           <p class="text-muted small mb-0">Application settings and configuration</p>
-        </div>
-        <FullscreenButton />
       </div>
 
     <!-- Accordion Container -->
@@ -487,7 +485,6 @@
 <script setup>
 import { inject, ref, onMounted, onActivated, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import FullscreenButton from '../common/FullscreenButton.vue';
 import FullscreenNavigation from '../common/FullscreenNavigation.vue';
 import DiscoveredUnitsModal from '../Modals/DiscoveredUnitsModal.vue';
 import useElectronAPI from '../../composables/useElectronAPI';

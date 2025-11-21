@@ -1,14 +1,14 @@
-# XLx Connector - Beta Release v1.0.0
+# XLx Connector - Release v1.1.0
 
-**Excel to zzTakeoff Integration Tool**
+**Excel to zzTakeoff Integration Tool - Multi-Screen Support**
 
 ## 📥 Download
 
 Download the installer for Windows:
-- [XLx Connector Setup 1.0.0.exe](https://github.com/samromeo1961/Excel-zzTakeoff-Connector/releases/download/v1.0.0/XLx.Connector.Setup.1.0.0.exe)
+- [XLx Connector Setup 1.1.0.exe](https://github.com/samromeo1961/Excel-zzTakeoff-Connector/releases/download/v1.1.0/XLx.Connector.Setup.1.1.0.exe)
 
 **File Size:** ~120 MB
-**SHA256 Checksum:** `996534683509e9bdff49ad1b2ab6ab9f2b65f8c09e21937dfc70d93212642a13`
+**Release Date:** November 21, 2025
 
 ---
 

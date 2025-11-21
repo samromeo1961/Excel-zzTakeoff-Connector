@@ -86,16 +86,12 @@
       <div class="d-flex gap-2 align-items-center ms-auto">
         <slot name="toolbar-actions"></slot>
       </div>
-
-      <!-- Fullscreen Button (Very Far Right) -->
-      <FullscreenButton />
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, watch } from 'vue';
-import FullscreenButton from './FullscreenButton.vue';
 import FullscreenNavigation from './FullscreenNavigation.vue';
 
 const props = defineProps({
