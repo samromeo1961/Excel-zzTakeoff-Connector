@@ -15,6 +15,7 @@
           <h4 class="mb-0">Preferences</h4>
           <p class="text-muted small mb-0">Application settings and configuration</p>
       </div>
+    </div>
 
     <!-- Accordion Container -->
     <div class="accordion mt-4" id="preferencesAccordion">
