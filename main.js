@@ -280,10 +280,12 @@ function createMainWindow() {
   console.log('🚀 createMainWindow() function called');
 
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: 1920,
+    height: 1080,
     title: 'XLx Connector for zzTakeoff',
     show: false,
+    resizable: true,
+    maximizable: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -295,6 +297,18 @@ function createMainWindow() {
 
   // Create application menu using the buildMenuTemplate function
   updateApplicationMenu();
+
+  // Forcefully reset window to normal state and size BEFORE loading content
+  // This prevents Electron from restoring a cached maximized state
+  if (mainWindow.isMaximized()) {
+    mainWindow.unmaximize();
+  }
+
+  // Set the window to the exact size we want
+  mainWindow.setSize(1920, 1080);
+
+  // Center the window on screen
+  mainWindow.center();
 
   // Load Vue app
   let startUrl;
@@ -351,10 +365,8 @@ function createMainWindow() {
   // Log load success/failure
   mainWindow.webContents.on('did-finish-load', () => {
     console.log('✓ Page loaded successfully');
-    // Ensure window opens in normal state, not maximized
-    if (mainWindow.isMaximized()) {
-      mainWindow.unmaximize();
-    }
+
+    // Show the window (sizing was already done during window creation)
     mainWindow.show();
   });
 

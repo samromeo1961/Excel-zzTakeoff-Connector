@@ -218,7 +218,7 @@ onMounted(async () => {
       theme.value = prefs.data.theme;
     }
 
-    // Check if there's a last opened file and navigate accordingly
+    // Check if there's a last opened file and auto-load it
     const recentsResult = await api.recentsStore.getAll();
     if (recentsResult.success && recentsResult.data && recentsResult.data.length > 0) {
       // There's a previous Excel document - navigate to Excel Grid
@@ -235,20 +235,12 @@ onMounted(async () => {
         }));
       }, 500);
     } else if (router.currentRoute.value.path === '/') {
-      // No previous document and on root path - check if first time
-      // If first time ever (no recents), go to Excel Grid
-      // Otherwise, default to zzTakeoff Web
-      const isFirstTime = !recentsResult.success || !recentsResult.data || recentsResult.data.length === 0;
-
-      if (isFirstTime) {
-        router.push('/excel');
-      } else {
-        router.push('/zztakeoff-web');
-      }
+      // No previous document - go to Excel Grid
+      router.push('/excel');
     }
 
-    // Enter fullscreen mode on startup
-    enterFullscreen();
+    // DO NOT enter fullscreen mode on startup - keep tabs visible
+    // enterFullscreen();
   } catch (error) {
     console.error('Failed to load preferences or recents:', error);
     // Default to Excel Grid if there's an error
