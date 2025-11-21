@@ -346,8 +346,6 @@ function createMainWindow() {
     mainWindow.loadURL(startUrl);
   }
 
-  // Maximize the window on startup
-  mainWindow.maximize();
 
   // Log load success/failure
   mainWindow.webContents.on('did-finish-load', () => {
