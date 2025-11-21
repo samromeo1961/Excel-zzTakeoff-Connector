@@ -283,6 +283,7 @@ function createMainWindow() {
     width: 1400,
     height: 900,
     title: 'XLx Connector for zzTakeoff',
+    show: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -350,6 +351,11 @@ function createMainWindow() {
   // Log load success/failure
   mainWindow.webContents.on('did-finish-load', () => {
     console.log('✓ Page loaded successfully');
+    // Ensure window opens in normal state, not maximized
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    }
+    mainWindow.show();
   });
 
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
