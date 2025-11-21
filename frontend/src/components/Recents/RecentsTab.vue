@@ -165,8 +165,8 @@
 
     <!-- Column Picker Modal -->
     <ColumnPickerModal
-      :is-open="showColumnPicker"
-      :column-defs="columnDefs"
+      :visible="showColumnPicker"
+      :columns="columnDefs"
       :grid-api="gridApi"
       @close="showColumnPicker = false"
       @apply="applyColumnChanges"
