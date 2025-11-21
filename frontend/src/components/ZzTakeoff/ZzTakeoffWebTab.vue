@@ -149,18 +149,14 @@
         <i class="bi" :class="theme === 'dark' ? 'bi-sun' : 'bi-moon'"></i>
       </button>
 
-      <!-- Maximize Button (when not maximized) -->
+      <!-- Focus Window Button -->
       <button
-        v-if="!isMaximized"
-        @click="toggleMaximize"
-        class="btn btn-sm btn-outline-success"
-        title="Maximize Webview (Fullscreen)"
+        @click="focusWindow"
+        class="btn btn-sm btn-primary"
+        title="Focus zzTakeoff Window"
       >
-        <i class="bi bi-fullscreen"></i>
+        <i class="bi bi-window"></i> Focus Window
       </button>
-
-      <!-- Fullscreen Button -->
-      <FullscreenButton />
     </div>
 
     <!-- Error Message -->
@@ -183,16 +179,20 @@
       </div>
     </div>
 
-    <!-- Info Message - BrowserView renders natively (only show when not maximized and no error) -->
-    <div v-if="!hasError && !isMaximized" class="alert alert-info m-3" role="alert">
-      <i class="bi bi-info-circle me-2"></i>
-      <strong>Native Web View</strong> - This page is rendered using Electron's BrowserView. Click the <i class="bi bi-fullscreen"></i> button to maximize once logged in.
+    <!-- Info Message - Separate Window -->
+    <div v-if="!hasError" class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-muted">
+      <i class="bi bi-window-desktop display-1 mb-3"></i>
+      <h3>zzTakeoff is open in a separate window</h3>
+      <p class="text-center" style="max-width: 500px;">
+        The zzTakeoff web interface is now running in its own window. You can move it to a second screen for better productivity.
+      </p>
+      <button @click="focusWindow" class="btn btn-primary mt-3">
+        <i class="bi bi-window"></i> Bring to Front
+      </button>
     </div>
 
-    <!-- Webview Container (BrowserView will be positioned here) -->
-    <div class="webview-container flex-grow-1 position-relative" ref="webviewContainerRef">
-      <!-- BrowserView will be overlaid by Electron -->
-
+    <!-- Webview Container (Hidden but kept for structure if needed) -->
+    <div class="webview-container position-relative" ref="webviewContainerRef" style="height: 0; overflow: hidden;">
       <!-- Grey overlay when dropdown is open -->
       <div
         v-if="showTabDropdown"
@@ -206,7 +206,6 @@
 <script setup>
 import { ref, inject, onMounted, onUnmounted, nextTick, watch, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import FullscreenButton from '../common/FullscreenButton.vue';
 import useElectronAPI from '../../composables/useElectronAPI';
 
 const theme = inject('theme');
@@ -258,77 +257,31 @@ const lastTabLabel = computed(() => {
 // Toggle tab dropdown
 const toggleTabDropdown = async () => {
   showTabDropdown.value = !showTabDropdown.value;
-
-  // When dropdown opens, adjust BrowserView bounds to make room
-  if (showTabDropdown.value) {
-    await nextTick();
-    const bounds = calculateBounds();
-    if (bounds && api.webview) {
-      // Reserve 450px for the dropdown menu
-      const dropdownHeight = 450;
-      const adjustedBounds = {
-        ...bounds,
-        y: bounds.y + dropdownHeight,
-        height: Math.max(bounds.height - dropdownHeight, 100)
-      };
-      await api.webview.setBounds(adjustedBounds);
-    }
-  } else {
-    // Restore original bounds when dropdown closes
-    await nextTick();
-    handleResize();
-  }
 };
 
 // Close dropdown
 const closeDropdown = async () => {
   showTabDropdown.value = false;
-  await nextTick();
-  handleResize();
 };
 
 // Exit fullscreen function
 const exitFullscreen = async () => {
   showTabDropdown.value = false; // Close dropdown
-  await nextTick();
-  handleResize(); // Restore bounds
   isMaximized.value = false; // Exit fullscreen mode
 };
 
-// Calculate bounds for BrowserView
-const calculateBounds = () => {
-  if (!webviewContainerRef.value) return null;
-
-  const rect = webviewContainerRef.value.getBoundingClientRect();
-  return {
-    x: Math.round(rect.left),
-    y: Math.round(rect.top),
-    width: Math.round(rect.width),
-    height: Math.round(rect.height)
-  };
-};
-
-// Create BrowserView
+// Create BrowserView (now Window)
 const createWebView = async () => {
   try {
-    await nextTick();
-    const bounds = calculateBounds();
-
-    if (!bounds || bounds.width === 0 || bounds.height === 0) {
-      console.warn('Invalid bounds, retrying...');
-      setTimeout(createWebView, 100);
-      return;
-    }
-
-    console.log('Creating BrowserView with bounds:', bounds);
-    const result = await api.webview.create(currentUrl.value, bounds);
+    console.log('Creating zzTakeoff Window...');
+    // We don't need bounds anymore for separate window
+    const result = await api.webview.create(currentUrl.value, {});
 
     if (result.success) {
-      console.log('BrowserView created successfully');
+      console.log('Window created successfully');
       isLoading.value = true;
 
-      // Update currentUrl with the actual URL from the BrowserView
-      // (important when BrowserView is restored from cache)
+      // Update currentUrl with the actual URL from the Window
       if (result.url) {
         currentUrl.value = result.url;
         console.log('Current URL updated to:', result.url);
@@ -341,7 +294,7 @@ const createWebView = async () => {
       errorMessage.value = result.message || 'Failed to create web view';
     }
   } catch (error) {
-    console.error('Error creating BrowserView:', error);
+    console.error('Error creating Window:', error);
     hasError.value = true;
     errorMessage.value = error.message || 'Failed to create web view';
   }
@@ -399,6 +352,16 @@ const goForward = async () => {
   }
 };
 
+// Focus the external window
+const focusWindow = async () => {
+  try {
+    // Re-calling create will focus the existing window
+    await api.webview.create(currentUrl.value, {});
+  } catch (error) {
+    console.error('Error focusing window:', error);
+  }
+};
+
 // Tab navigation functions
 const goBackToLastTab = async () => {
   // Save the current active tab before leaving
@@ -409,16 +372,11 @@ const goBackToLastTab = async () => {
 
   // Navigate to the last selected tab
   await router.push(lastTabPath.value);
-
-  // Keep maximized state when going back to the tab
-  // (isMaximized stays true, the other tab will handle it)
 };
 
 const selectTabAndGoBack = async (tab) => {
-  // Close the dropdown and restore BrowserView bounds
+  // Close the dropdown
   showTabDropdown.value = false;
-  await nextTick();
-  handleResize();
 
   // Save the selected tab to preferences
   lastTabPath.value = tab.path;
@@ -427,11 +385,8 @@ const selectTabAndGoBack = async (tab) => {
   // Mark that we're navigating via dropdown
   navigatingViaDropdown.value = true;
 
-  // Navigate to the selected tab and keep it maximized
+  // Navigate to the selected tab
   await router.push(tab.path);
-
-  // Keep maximized state
-  // (isMaximized stays true for the selected tab)
 };
 
 const saveLastActiveTab = async () => {
@@ -446,7 +401,6 @@ const saveLastActiveTab = async () => {
 // Find in Page functions
 const toggleFindBar = async () => {
   console.log('[Find] Toggle find bar clicked, current state:', showFindBar.value);
-  console.log('[Find] WebView available:', !!api.webview);
 
   showFindBar.value = !showFindBar.value;
 
@@ -540,10 +494,6 @@ const handleFoundInPage = (result) => {
 
 const toggleMaximize = () => {
   isMaximized.value = !isMaximized.value;
-  // Recalculate and update bounds after maximize state changes
-  nextTick(() => {
-    handleResize();
-  });
 };
 
 // Event handlers
@@ -582,23 +532,6 @@ const handleLoadError = (error) => {
   isLoading.value = false;
 };
 
-// Handle window resize
-const handleResize = () => {
-  const bounds = calculateBounds();
-  if (bounds && api.webview) {
-    api.webview.setBounds(bounds);
-  }
-};
-
-// Watch for maximize state changes to update bounds
-watch(isMaximized, async () => {
-  // Wait for DOM to update, then recalculate bounds
-  await nextTick();
-  setTimeout(() => {
-    handleResize();
-  }, 100);
-});
-
 // Track navigation TO this component to save the previous tab
 watch(() => router.currentRoute.value.path, async (newPath, oldPath) => {
   // If navigating TO zzTakeoff Web from another tab (not via dropdown)
@@ -615,16 +548,11 @@ watch(() => router.currentRoute.value.path, async (newPath, oldPath) => {
 // Setup and cleanup
 onMounted(async () => {
   // Load last active tab from preferences
-  let shouldAutoMaximize = true; // Default to maximized for zzTakeoff Web tab
   try {
     if (api.preferencesStore) {
       const response = await api.preferencesStore.get();
       if (response?.success && response.data?.lastActiveTab) {
         lastTabPath.value = response.data.lastActiveTab;
-      }
-      // Check if webview should auto-maximize (defaults to true)
-      if (response?.success && response.data?.openExpanded !== undefined) {
-        shouldAutoMaximize = response.data.openExpanded;
       }
     }
   } catch (error) {
@@ -639,41 +567,13 @@ onMounted(async () => {
     api.webview.onFoundInPage(handleFoundInPage);
   }
 
-  // Create BrowserView
+  // Create/Focus Window
   await createWebView();
-
-  // Auto-maximize webview if preference is enabled OR if parent set maximize state
-  if (shouldAutoMaximize || isMaximized.value) {
-    console.log('Auto-maximizing webview based on:', shouldAutoMaximize ? 'openExpanded preference' : 'parent maximize state');
-    if (!isMaximized.value) {
-      toggleMaximize();
-    } else {
-      // If already set to true by parent (e.g., SendToZzTakeoffModal), just update bounds
-      await nextTick();
-      handleResize();
-    }
-  }
-
-  // Listen for window resize
-  window.addEventListener('resize', handleResize);
 });
 
 onUnmounted(async () => {
-  // Don't reset maximize state on unmount - let App.vue control the maximize state
-  // This allows navigation between tabs via dropdown while staying maximized
-
-  // Remove resize listener
-  window.removeEventListener('resize', handleResize);
-
-  // Destroy BrowserView
-  if (api.webview) {
-    try {
-      await api.webview.destroy();
-      console.log('BrowserView destroyed');
-    } catch (error) {
-      console.error('Error destroying BrowserView:', error);
-    }
-  }
+  // We do NOT destroy the window on unmount anymore, so it persists
+  // The user can close it manually or it closes when the app closes
 });
 </script>
 

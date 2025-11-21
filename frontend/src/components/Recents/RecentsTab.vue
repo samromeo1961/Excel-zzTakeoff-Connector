@@ -123,7 +123,6 @@
         >
           <i class="bi bi-trash"></i>
         </button>
-        <FullscreenButton />
       </div>
     </div>
 
@@ -180,7 +179,6 @@ import { ref, inject, onMounted, onBeforeUnmount, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { AgGridVue } from 'ag-grid-vue3';
 import 'ag-grid-community/styles/ag-theme-quartz.css';
-import FullscreenButton from '../common/FullscreenButton.vue';
 import FullscreenNavigation from '../common/FullscreenNavigation.vue';
 import ColumnPickerModal from '../Excel/ColumnPickerModal.vue';
 import useElectronAPI from '../../composables/useElectronAPI';

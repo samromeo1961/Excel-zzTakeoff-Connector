@@ -48,7 +48,6 @@ const { getRecents } = require('./src/database/recents-store');
 const store = new Store();
 
 let mainWindow = null;
-let webView = null; // BrowserView for zzTakeoff webview
 
 /**
  * Build recent files submenu
@@ -180,20 +179,16 @@ function buildMenuTemplate() {
           }
         },
         {
-          label: 'Toggle Developer Tools (BrowserView)',
+          label: 'Toggle Developer Tools (zzTakeoff Window)',
           accelerator: 'Ctrl+Shift+I',
           click: () => {
-            if (webView && webView.webContents) {
-              if (webView.webContents.isDevToolsOpened()) {
-                webView.webContents.closeDevTools();
-              } else {
-                webView.webContents.openDevTools({ mode: 'detach' });
-              }
+            if (zzTakeoffWindow && !zzTakeoffWindow.isDestroyed()) {
+              zzTakeoffWindow.webContents.toggleDevTools();
             } else {
               dialog.showMessageBox(mainWindow, {
                 type: 'info',
-                title: 'BrowserView Not Available',
-                message: 'BrowserView has not been created yet. Please navigate to the zzTakeoff Web tab first.'
+                title: 'zzTakeoff Window Not Available',
+                message: 'The zzTakeoff window is not open. Please navigate to the zzTakeoff Web tab first.'
               });
             }
           }
@@ -343,7 +338,7 @@ function createMainWindow() {
       console.log('Attempting to load URL:', startUrl);
       mainWindow.loadURL(startUrl);
     });
-  } else{
+  } else {
     // Production mode - load built files from dist
     startUrl = `file://${path.join(__dirname, 'frontend/dist/index.html')}`;
     console.log('Loading from production build:', startUrl);
@@ -528,8 +523,10 @@ ipcMain.handle('templates-store:delete', templatesStoreHandlers.handleDeleteTemp
 ipcMain.handle('templates-store:clear', templatesStoreHandlers.handleClearTemplates);
 
 // ============================================================
-// IPC Handlers for BrowserView (zzTakeoff Webview)
+// IPC Handlers for zzTakeoff Window (formerly BrowserView)
 // ============================================================
+
+let zzTakeoffWindow = null;
 
 ipcMain.handle('webview:create', async (event, url, bounds) => {
   try {
@@ -537,41 +534,35 @@ ipcMain.handle('webview:create', async (event, url, bounds) => {
       return { success: false, message: 'Main window not found' };
     }
 
-    // If BrowserView already exists, just restore it instead of recreating
-    if (webView) {
-      console.log('BrowserView already exists, restoring...');
-      if (mainWindow.getBrowserViews().includes(webView)) {
-        mainWindow.removeBrowserView(webView);
-      }
+    // If Window already exists, just focus it
+    if (zzTakeoffWindow) {
+      console.log('zzTakeoff Window already exists, focusing...');
+      if (!zzTakeoffWindow.isDestroyed()) {
+        zzTakeoffWindow.show();
+        zzTakeoffWindow.focus();
 
-      mainWindow.addBrowserView(webView);
-      webView.setBounds(bounds);
-      webView.setAutoResize({ width: true, height: true });
+        const currentURL = zzTakeoffWindow.webContents.getURL();
+        console.log('Window focused, current URL:', currentURL);
 
-      const currentURL = webView.webContents.getURL();
-      console.log('BrowserView restored, preserving current URL:', currentURL);
+        if (!currentURL || currentURL === '' || currentURL === 'about:blank') {
+          console.log('Window has no URL, loading:', url);
+          await zzTakeoffWindow.loadURL(url);
+        }
 
-      if (!currentURL || currentURL === '' || currentURL === 'about:blank') {
-        console.log('BrowserView has no URL, loading:', url);
-        await webView.webContents.loadURL(url);
+        return { success: true, url: zzTakeoffWindow.webContents.getURL(), restored: true };
       } else {
-        console.log('BrowserView has existing session, keeping current page to preserve login');
-        const currentZoom = webView.webContents.getZoomFactor();
-        webView.webContents.setZoomFactor(currentZoom);
-        webView.webContents.invalidate();
+        zzTakeoffWindow = null; // Handle destroyed window case
       }
-
-      webView.webContents.focus();
-      mainWindow.setTopBrowserView(webView);
-
-      console.log('BrowserView restored with bounds:', bounds);
-      return { success: true, url: webView.webContents.getURL(), restored: true };
     }
 
-    // Create new BrowserView with persistent session
-    console.log('Creating new BrowserView with persistent session...');
+    // Create new BrowserWindow with persistent session
+    console.log('Creating new zzTakeoff Window with persistent session...');
 
-    const browserViewConfig = {
+    zzTakeoffWindow = new BrowserWindow({
+      width: 1200,
+      height: 800,
+      title: 'zzTakeoff Web',
+      icon: path.join(__dirname, 'assets', 'icon.png'),
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -580,65 +571,74 @@ ipcMain.handle('webview:create', async (event, url, bounds) => {
         webSecurity: true,
         enableRemoteModule: false,
         backgroundThrottling: false
-      }
-    };
+      },
+      autoHideMenuBar: true
+    });
 
-    webView = new BrowserView(browserViewConfig);
-    webView.setBackgroundColor('#ffffff');
-
-    mainWindow.addBrowserView(webView);
-    webView.setBounds(bounds);
-    webView.setAutoResize({ width: true, height: true });
-
-    console.log('Loading URL in BrowserView:', url);
-    await webView.webContents.loadURL(url);
-
-    webView.webContents.focus();
-    mainWindow.setTopBrowserView(webView);
+    // Load URL
+    console.log('Loading URL in zzTakeoff Window:', url);
+    await zzTakeoffWindow.loadURL(url);
 
     // Forward lifecycle events
-    webView.webContents.on('did-start-loading', () => {
-      mainWindow.webContents.send('webview:loading', true);
+    zzTakeoffWindow.webContents.on('did-start-loading', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('webview:loading', true);
+      }
     });
 
-    webView.webContents.on('did-stop-loading', () => {
-      mainWindow.webContents.send('webview:loading', false);
+    zzTakeoffWindow.webContents.on('did-stop-loading', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('webview:loading', false);
+      }
     });
 
-    webView.webContents.on('did-navigate', (event, url) => {
-      mainWindow.webContents.send('webview:url-changed', url);
+    zzTakeoffWindow.webContents.on('did-navigate', (event, url) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('webview:url-changed', url);
+      }
     });
 
-    webView.webContents.on('did-navigate-in-page', (event, url) => {
-      mainWindow.webContents.send('webview:url-changed', url);
+    zzTakeoffWindow.webContents.on('did-navigate-in-page', (event, url) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('webview:url-changed', url);
+      }
     });
 
-    webView.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
-      mainWindow.webContents.send('webview:load-error', {
-        errorCode,
-        errorDescription,
-        url: validatedURL
-      });
+    zzTakeoffWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('webview:load-error', {
+          errorCode,
+          errorDescription,
+          url: validatedURL
+        });
+      }
     });
 
-    webView.webContents.on('found-in-page', (event, result) => {
-      mainWindow.webContents.send('webview:found-in-page', result);
+    zzTakeoffWindow.webContents.on('found-in-page', (event, result) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('webview:found-in-page', result);
+      }
     });
 
-    console.log('BrowserView created successfully');
+    zzTakeoffWindow.on('closed', () => {
+      zzTakeoffWindow = null;
+    });
+
+    console.log('zzTakeoff Window created successfully');
     return { success: true, url };
   } catch (error) {
-    console.error('Error creating BrowserView:', error);
+    console.error('Error creating zzTakeoff Window:', error);
     return { success: false, message: error.message };
   }
 });
 
 ipcMain.handle('webview:navigate', async (event, url) => {
   try {
-    if (!webView) {
-      return { success: false, message: 'Webview not initialized' };
+    if (!zzTakeoffWindow || zzTakeoffWindow.isDestroyed()) {
+      return { success: false, message: 'zzTakeoff Window not initialized' };
     }
-    await webView.webContents.loadURL(url);
+    await zzTakeoffWindow.loadURL(url);
+    zzTakeoffWindow.focus();
     return { success: true, url };
   } catch (error) {
     return { success: false, message: error.message };
@@ -647,10 +647,10 @@ ipcMain.handle('webview:navigate', async (event, url) => {
 
 ipcMain.handle('webview:reload', async (event) => {
   try {
-    if (!webView) {
-      return { success: false, message: 'Webview not initialized' };
+    if (!zzTakeoffWindow || zzTakeoffWindow.isDestroyed()) {
+      return { success: false, message: 'zzTakeoff Window not initialized' };
     }
-    webView.webContents.reload();
+    zzTakeoffWindow.webContents.reload();
     return { success: true };
   } catch (error) {
     return { success: false, message: error.message };
@@ -659,10 +659,10 @@ ipcMain.handle('webview:reload', async (event) => {
 
 ipcMain.handle('webview:destroy', async (event) => {
   try {
-    if (webView && mainWindow) {
-      console.log('Hiding BrowserView (preserving session)...');
-      webView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
-      mainWindow.removeBrowserView(webView);
+    if (zzTakeoffWindow && !zzTakeoffWindow.isDestroyed()) {
+      console.log('Closing zzTakeoff Window...');
+      zzTakeoffWindow.close();
+      zzTakeoffWindow = null;
     }
     return { success: true };
   } catch (error) {
@@ -671,24 +671,17 @@ ipcMain.handle('webview:destroy', async (event) => {
 });
 
 ipcMain.handle('webview:set-bounds', async (event, bounds) => {
-  try {
-    if (!webView) {
-      return { success: false, message: 'Webview not initialized' };
-    }
-    webView.setBounds(bounds);
-    return { success: true };
-  } catch (error) {
-    return { success: false, message: error.message };
-  }
+  // No-op for separate window
+  return { success: true };
 });
 
 ipcMain.handle('webview:go-back', async (event) => {
   try {
-    if (!webView) {
-      return { success: false, message: 'Webview not initialized' };
+    if (!zzTakeoffWindow || zzTakeoffWindow.isDestroyed()) {
+      return { success: false, message: 'zzTakeoff Window not initialized' };
     }
-    if (webView.webContents.canGoBack()) {
-      webView.webContents.goBack();
+    if (zzTakeoffWindow.webContents.canGoBack()) {
+      zzTakeoffWindow.webContents.goBack();
       return { success: true, canGoBack: true };
     }
     return { success: true, canGoBack: false };
@@ -699,11 +692,11 @@ ipcMain.handle('webview:go-back', async (event) => {
 
 ipcMain.handle('webview:go-forward', async (event) => {
   try {
-    if (!webView) {
-      return { success: false, message: 'Webview not initialized' };
+    if (!zzTakeoffWindow || zzTakeoffWindow.isDestroyed()) {
+      return { success: false, message: 'zzTakeoff Window not initialized' };
     }
-    if (webView.webContents.canGoForward()) {
-      webView.webContents.goForward();
+    if (zzTakeoffWindow.webContents.canGoForward()) {
+      zzTakeoffWindow.webContents.goForward();
       return { success: true, canGoForward: true };
     }
     return { success: true, canGoForward: false };
@@ -714,10 +707,10 @@ ipcMain.handle('webview:go-forward', async (event) => {
 
 ipcMain.handle('webview:find-in-page', async (event, text, options) => {
   try {
-    if (!webView) {
-      return { success: false, message: 'Webview not initialized' };
+    if (!zzTakeoffWindow || zzTakeoffWindow.isDestroyed()) {
+      return { success: false, message: 'zzTakeoff Window not initialized' };
     }
-    const requestId = webView.webContents.findInPage(text, options);
+    const requestId = zzTakeoffWindow.webContents.findInPage(text, options);
     return { success: true, requestId };
   } catch (error) {
     return { success: false, message: error.message };
@@ -726,10 +719,10 @@ ipcMain.handle('webview:find-in-page', async (event, text, options) => {
 
 ipcMain.handle('webview:stop-find-in-page', async (event, action) => {
   try {
-    if (!webView) {
-      return { success: false, message: 'Webview not initialized' };
+    if (!zzTakeoffWindow || zzTakeoffWindow.isDestroyed()) {
+      return { success: false, message: 'zzTakeoff Window not initialized' };
     }
-    webView.webContents.stopFindInPage(action);
+    zzTakeoffWindow.webContents.stopFindInPage(action);
     return { success: true };
   } catch (error) {
     return { success: false, message: error.message };
@@ -738,10 +731,10 @@ ipcMain.handle('webview:stop-find-in-page', async (event, action) => {
 
 ipcMain.handle('webview:execute-javascript', async (event, code) => {
   try {
-    if (!webView) {
-      return { success: false, message: 'Webview not initialized' };
+    if (!zzTakeoffWindow || zzTakeoffWindow.isDestroyed()) {
+      return { success: false, message: 'zzTakeoff Window not initialized' };
     }
-    const result = await webView.webContents.executeJavaScript(code);
+    const result = await zzTakeoffWindow.webContents.executeJavaScript(code);
     return { success: true, result };
   } catch (error) {
     return { success: false, message: error.message };
