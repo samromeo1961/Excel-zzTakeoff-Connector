@@ -115,7 +115,8 @@ async function readExcelFile(event, filePath) {
     const firstSheet = result.sheets.find(sheet => !sheet.hidden);
 
     // Get column mappings to find the correct unit column
-    const columnMappingsData = getColumnMappings();
+    // CRITICAL: Use combined mappings (file-specific + global) so that custom mappings are respected
+    const columnMappingsData = getCombinedColumnMappings(filePath);
 
     if (firstSheet && firstSheet.data && firstSheet.data.length > 0) {
       const units = extractUnits(firstSheet.data, columnMappingsData);
@@ -518,7 +519,8 @@ async function rescanFileForUnits(event, filePath) {
     const firstSheet = result.sheets.find(sheet => !sheet.hidden);
 
     // Get column mappings to find the correct unit column
-    const columnMappingsData = getColumnMappings();
+    // CRITICAL: Use combined mappings (file-specific + global) so that custom mappings are respected
+    const columnMappingsData = getCombinedColumnMappings(filePath);
 
     if (firstSheet && firstSheet.data && firstSheet.data.length > 0) {
       const units = extractUnits(firstSheet.data, columnMappingsData);
@@ -610,6 +612,72 @@ async function getFileStats(event, filePath) {
   }
 }
 
+/**
+ * Re-apply unit mappings to the entire file (updates SQLite)
+ * @param {Event} event - IPC event
+ * @param {string} filePath - Path to Excel file
+ * @returns {Promise<{success: boolean, message?: string}>}
+ */
+async function reapplyMappings(event, filePath) {
+  try {
+    logger.logInfo('[Excel Handler] Re-applying mappings', { filePath });
+
+    // SECURITY: Validate file path
+    const validatedPath = validateFilePath(filePath, {
+      mustExist: true,
+      checkExtension: true
+    });
+
+    // Get combined mappings
+    const unitMappings = getCombinedUnitMappings(validatedPath);
+    const columnMappings = getCombinedColumnMappings(validatedPath);
+
+    // Get all sheets
+    const sheets = await excelDB.getSheetList(validatedPath);
+
+    let totalUpdated = 0;
+
+    for (const sheet of sheets) {
+      // Query all rows for this sheet
+      const result = await excelDB.querySheet(validatedPath, sheet.name, {
+        limit: -1 // Get all rows
+      });
+
+      if (result.data && result.data.length > 0) {
+        // Apply mappings with FORCE=true to overwrite existing auto-mappings
+        const updatedData = applyZzTypeMappings(result.data, unitMappings, columnMappings, true);
+
+        // Identify rows that actually changed
+        const updates = [];
+        for (let i = 0; i < result.data.length; i++) {
+          const oldRow = result.data[i];
+          const newRow = updatedData[i];
+
+          if (oldRow._zzType !== newRow._zzType) {
+            updates.push({
+              rowId: oldRow._id,
+              updates: { _zzType: newRow._zzType }
+            });
+          }
+        }
+
+        if (updates.length > 0) {
+          await excelDB.bulkUpdateRows(validatedPath, sheet.name, updates);
+          totalUpdated += updates.length;
+          logger.logDebug(`[Excel Handler] Updated ${updates.length} rows in sheet "${sheet.name}"`);
+        }
+      }
+    }
+
+    logger.logInfo('[Excel Handler] Re-apply mappings complete', { totalUpdated });
+    return { success: true, totalUpdated };
+
+  } catch (error) {
+    logger.logError('[Excel Handler] Error re-applying mappings', error);
+    return createErrorResponse(error, 'reapplyMappings');
+  }
+}
+
 module.exports = {
   readExcelFile,
   writeExcelFile,
@@ -620,5 +688,6 @@ module.exports = {
   getSheetList,
   closeFile,
   rescanFileForUnits,
-  getFileStats
+  getFileStats,
+  reapplyMappings
 };

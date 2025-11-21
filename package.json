@@ -1,6 +1,6 @@
 {
   "name": "excel-zztakeoff-connector",
-  "version": "1.1.2",
+  "version": "1.1.4",
   "description": "Excel-zzTakeoff Connector - Vue.js + AG Grid + SheetJS Electron Edition",
   "main": "main.js",
   "scripts": {

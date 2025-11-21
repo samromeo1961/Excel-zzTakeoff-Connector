@@ -149,13 +149,22 @@
         <i class="bi" :class="theme === 'dark' ? 'bi-sun' : 'bi-moon'"></i>
       </button>
 
-      <!-- Focus Window Button -->
+      <!-- Focus zzTakeoff Window Button -->
       <button
-        @click="focusWindow"
+        @click="focusZzTakeoffWindow"
         class="btn btn-sm btn-primary"
         title="Focus zzTakeoff Window"
       >
         <i class="bi bi-window"></i> Focus Window
+      </button>
+
+      <!-- Back to XLx Connector Button -->
+      <button
+        @click="focusMainWindow"
+        class="btn btn-sm btn-outline-warning"
+        title="Back to XLx Connector (Ctrl+B in zzTakeoff window)"
+      >
+        <i class="bi bi-arrow-left-circle"></i> Back to XLx
       </button>
     </div>
 
@@ -186,7 +195,7 @@
       <p class="text-center" style="max-width: 500px;">
         The zzTakeoff web interface is now running in its own window. You can move it to a second screen for better productivity.
       </p>
-      <button @click="focusWindow" class="btn btn-primary mt-3">
+      <button @click="focusZzTakeoffWindow" class="btn btn-primary mt-3">
         <i class="bi bi-window"></i> Bring to Front
       </button>
     </div>
@@ -352,13 +361,22 @@ const goForward = async () => {
   }
 };
 
-// Focus the external window
-const focusWindow = async () => {
+// Focus the external zzTakeoff window
+const focusZzTakeoffWindow = async () => {
   try {
     // Re-calling create will focus the existing window
     await api.webview.create(currentUrl.value, {});
   } catch (error) {
-    console.error('Error focusing window:', error);
+    console.error('Error focusing zzTakeoff window:', error);
+  }
+};
+
+// Focus the main XLx Connector window (reopens if closed)
+const focusMainWindow = async () => {
+  try {
+    await api.webview.focusMainWindow();
+  } catch (error) {
+    console.error('Error focusing main window:', error);
   }
 };
 

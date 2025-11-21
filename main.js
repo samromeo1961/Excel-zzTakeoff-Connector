@@ -379,6 +379,23 @@ function createMainWindow() {
   });
 }
 
+/**
+ * Focus or reopen the main window
+ * Called from zzTakeoff window menu or when main window is accidentally closed
+ */
+function focusOrReopenMainWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    // Main window exists, just focus it
+    mainWindow.show();
+    mainWindow.focus();
+    console.log('Main window focused');
+  } else {
+    // Main window was closed, recreate it
+    console.log('Main window was closed, reopening...');
+    createMainWindow();
+  }
+}
+
 // ============================================================
 // IPC Handlers for File Operations
 // ============================================================
@@ -443,6 +460,7 @@ ipcMain.handle('excel:get-sheet-list', excelHandlers.getSheetList);
 ipcMain.handle('excel:close-file', excelHandlers.closeFile);
 ipcMain.handle('excel:rescan-units', excelHandlers.rescanFileForUnits);
 ipcMain.handle('excel:get-file-stats', excelHandlers.getFileStats);
+ipcMain.handle('excel:reapply-mappings', excelHandlers.reapplyMappings);
 
 // ============================================================
 // IPC Handlers for External APIs (zzTakeoff)
@@ -588,8 +606,87 @@ ipcMain.handle('webview:create', async (event, url, bounds) => {
         enableRemoteModule: false,
         backgroundThrottling: false
       },
-      autoHideMenuBar: true
+      autoHideMenuBar: false // Show menu bar for navigation
     });
+
+    // Create a simple menu for the zzTakeoff window
+    const zzTakeoffMenu = Menu.buildFromTemplate([
+      {
+        label: 'Navigation',
+        submenu: [
+          {
+            label: 'Back to XLx Connector',
+            accelerator: 'CmdOrCtrl+B',
+            click: () => {
+              focusOrReopenMainWindow();
+            }
+          },
+          { type: 'separator' },
+          {
+            label: 'Reload Page',
+            accelerator: 'CmdOrCtrl+R',
+            click: () => {
+              if (zzTakeoffWindow && !zzTakeoffWindow.isDestroyed()) {
+                zzTakeoffWindow.webContents.reload();
+              }
+            }
+          },
+          {
+            label: 'Go to Login',
+            click: () => {
+              if (zzTakeoffWindow && !zzTakeoffWindow.isDestroyed()) {
+                zzTakeoffWindow.loadURL('https://www.zztakeoff.com/login');
+              }
+            }
+          }
+        ]
+      },
+      {
+        label: 'View',
+        submenu: [
+          {
+            label: 'Zoom In',
+            accelerator: 'CmdOrCtrl+Plus',
+            click: () => {
+              if (zzTakeoffWindow && !zzTakeoffWindow.isDestroyed()) {
+                const currentZoom = zzTakeoffWindow.webContents.getZoomFactor();
+                zzTakeoffWindow.webContents.setZoomFactor(currentZoom + 0.1);
+              }
+            }
+          },
+          {
+            label: 'Zoom Out',
+            accelerator: 'CmdOrCtrl+-',
+            click: () => {
+              if (zzTakeoffWindow && !zzTakeoffWindow.isDestroyed()) {
+                const currentZoom = zzTakeoffWindow.webContents.getZoomFactor();
+                zzTakeoffWindow.webContents.setZoomFactor(Math.max(0.5, currentZoom - 0.1));
+              }
+            }
+          },
+          {
+            label: 'Reset Zoom',
+            accelerator: 'CmdOrCtrl+0',
+            click: () => {
+              if (zzTakeoffWindow && !zzTakeoffWindow.isDestroyed()) {
+                zzTakeoffWindow.webContents.setZoomFactor(1);
+              }
+            }
+          },
+          { type: 'separator' },
+          {
+            label: 'Toggle DevTools',
+            accelerator: 'F12',
+            click: () => {
+              if (zzTakeoffWindow && !zzTakeoffWindow.isDestroyed()) {
+                zzTakeoffWindow.webContents.toggleDevTools();
+              }
+            }
+          }
+        ]
+      }
+    ]);
+    zzTakeoffWindow.setMenu(zzTakeoffMenu);
 
     // Load URL
     console.log('Loading URL in zzTakeoff Window:', url);
@@ -752,6 +849,15 @@ ipcMain.handle('webview:execute-javascript', async (event, code) => {
     }
     const result = await zzTakeoffWindow.webContents.executeJavaScript(code);
     return { success: true, result };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+});
+
+ipcMain.handle('webview:focus-main-window', async (event) => {
+  try {
+    focusOrReopenMainWindow();
+    return { success: true };
   } catch (error) {
     return { success: false, message: error.message };
   }

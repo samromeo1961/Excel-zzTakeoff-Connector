@@ -31,7 +31,8 @@ export default function useElectronAPI() {
       getSheetList: (filePath) => window.electronAPI?.excel.getSheetList(filePath),
       closeFile: (filePath) => window.electronAPI?.excel.closeFile(filePath),
       rescanUnits: (filePath) => window.electronAPI?.excel.rescanUnits(filePath),
-      getFileStats: (filePath) => window.electronAPI?.excel.getFileStats(filePath)
+      getFileStats: (filePath) => window.electronAPI?.excel.getFileStats(filePath),
+      reapplyMappings: (filePath) => window.electronAPI?.excel.reapplyMappings(filePath)
     },
     // Database operations
     db: {
@@ -220,6 +221,7 @@ export default function useElectronAPI() {
       findInPage: (text, options) => window.electronAPI?.webview.findInPage(text, options),
       stopFindInPage: (action) => window.electronAPI?.webview.stopFindInPage(action),
       executeJavaScript: (code) => window.electronAPI?.webview.executeJavaScript(code),
+      focusMainWindow: () => window.electronAPI?.webview.focusMainWindow(),
       onLoading: (callback) => window.electronAPI?.webview.onLoading(callback),
       onUrlChanged: (callback) => window.electronAPI?.webview.onUrlChanged(callback),
       onLoadError: (callback) => window.electronAPI?.webview.onLoadError(callback),

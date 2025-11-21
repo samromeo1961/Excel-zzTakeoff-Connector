@@ -177,8 +177,20 @@
             </div>
 
             <div v-else class="alert alert-info">
-              <i class="bi bi-info-circle me-2"></i>
-              No unit mappings configured. Load an Excel file to discover units automatically.
+              <div v-if="discoveredUnitsCount > 0" class="d-flex align-items-center justify-content-between">
+                <div>
+                  <i class="bi bi-exclamation-circle me-2"></i>
+                  <strong>{{ discoveredUnitsCount }} units discovered!</strong>
+                  <div class="small mt-1">These units need to be mapped to zzTypes before they appear here.</div>
+                </div>
+                <button class="btn btn-sm btn-primary" @click="openDiscoveredUnitsModal">
+                  Configure Now
+                </button>
+              </div>
+              <div v-else>
+                <i class="bi bi-info-circle me-2"></i>
+                No unit mappings configured. Load an Excel file to discover units automatically.
+              </div>
             </div>
           </div>
         </div>

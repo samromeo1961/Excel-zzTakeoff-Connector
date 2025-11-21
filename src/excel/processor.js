@@ -224,33 +224,33 @@ function extractUnits(data, columnMappings = null) {
     } else {
       // Fall back to trying various common column names for units
       unit = row.unit || row.Unit || row.UNIT || row.Units || row.units ||
-             row.UOM || row.uom || row.UM || row.um ||
-             row.PerCode || row.percode || row.Percode || row.PERCODE ||
-             row.PerCodes || row.percodes || row.Percodes || row.PERCODES;
+        row.UOM || row.uom || row.UM || row.um ||
+        row.PerCode || row.percode || row.Percode || row.PERCODE ||
+        row.PerCodes || row.percodes || row.Percodes || row.PERCODES;
     }
 
     if (unit && typeof unit === 'string' && unit.trim()) {
       units.add(unit.trim());
     }
   });
-
   return Array.from(units).sort();
 }
 
 /**
- * Apply zzType mappings to data (fill missing only)
+ * Apply zzType mappings to data
  * @param {Array<Object>} data - Array of row objects
  * @param {Array<Object>} mappings - Array of {unit, zzType, active} mappings
+ * @param {Object} columnMappings - Optional column mappings to find unit column
+ * @param {boolean} force - If true, overwrite existing _zzType
  * @returns {Array<Object>} - Data with zzType applied
  */
-function applyZzTypeMappings(data, mappings) {
+function applyZzTypeMappings(data, mappings, columnMappings = null, force = false) {
   if (!Array.isArray(data) || !Array.isArray(mappings)) {
     return data;
   }
 
-  // Filter for active mappings only
-  const activeMappings = mappings.filter(m => m.active === true);
-
+  // Filter active mappings
+  const activeMappings = mappings.filter(m => m.active);
   if (activeMappings.length === 0) {
     return data;
   }
@@ -258,15 +258,34 @@ function applyZzTypeMappings(data, mappings) {
   // Create a map for quick lookup
   const mappingMap = new Map(activeMappings.map(m => [m.unit, m.zzType]));
 
+  // Try to get the mapped Excel column for 'units' from column mappings
+  let mappedUnitColumn = null;
+  if (columnMappings && columnMappings.preferredColumns) {
+    const unitsMapping = columnMappings.preferredColumns.find(col => col.id === 'units');
+    if (unitsMapping && unitsMapping.excelColumn) {
+      mappedUnitColumn = unitsMapping.excelColumn;
+    }
+  }
+
   // Apply mappings to rows
   return data.map(row => {
-    // Skip if row already has a zzType set
-    if (row._zzType || row.zzType || row.zztype || row.ZZTYPE) {
+    // Skip if row already has a zzType set and we are not forcing update
+    if (!force && (row._zzType || row.zzType || row.zztype || row.ZZTYPE)) {
       return row;
     }
 
-    // Get unit from row (try various column names)
-    const unit = row.unit || row.Unit || row.UNIT || row.Units || row.units || row.UOM || row.uom;
+    let unit = null;
+
+    // First, try the mapped column if available
+    if (mappedUnitColumn && row[mappedUnitColumn]) {
+      unit = row[mappedUnitColumn];
+    } else {
+      // Fall back to trying various common column names for units
+      unit = row.unit || row.Unit || row.UNIT || row.Units || row.units ||
+        row.UOM || row.uom || row.UM || row.um ||
+        row.PerCode || row.percode || row.Percode || row.PERCODE ||
+        row.PerCodes || row.percodes || row.Percodes || row.PERCODES;
+    }
 
     if (unit && typeof unit === 'string' && mappingMap.has(unit.trim())) {
       // Apply the mapped zzType

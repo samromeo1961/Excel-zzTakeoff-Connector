@@ -161,5 +161,16 @@ ZzTakeoffWebTab creates persistent BrowserView with `partition: 'persist:zztakeo
 netstat -ano | findstr :5185                                    # View port usage
 dir "C:\Users\User\AppData\Roaming\excel-zztakeoff-connector"  # Check store files
 ```
-- Can the final project by an Electron App that can be installed on Windows IOS and Linux
-- If I have a Excel File open in AG Grid and I Navigate away to another Tab even if it hasn't been saved I expect it to Persist until the application is closed and at that time the user needs to be asked to save the File and it should be available in recent files next time the application is open
+
+## Cross-Platform Build Targets
+
+The application is configured for Windows, macOS, and Linux via electron-builder:
+- **Windows:** NSIS installer (x64)
+- **macOS:** DMG and ZIP (universal)
+- **Linux:** AppImage and DEB
+
+## Application Behavior
+
+- **Tab Persistence:** Excel files remain in memory when navigating between tabs (not saved to disk until explicit save)
+- **Unsaved Changes:** User is prompted to save before closing the application
+- **Recent Files:** Files appear in recents upon opening, available on next app launch

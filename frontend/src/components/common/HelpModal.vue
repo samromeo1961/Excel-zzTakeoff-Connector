@@ -186,15 +186,30 @@
             <!-- zzTakeoff Web Tab -->
             <section id="zztakeoff-web" class="help-section">
               <h2 class="section-title"><i class="bi bi-globe me-2"></i>zzTakeoff Web Tab</h2>
-              <p>Embedded zzTakeoff web interface for seamless project access.</p>
+              <p>The zzTakeoff web interface opens in a separate window for multi-monitor productivity.</p>
 
               <h4>Features:</h4>
               <ul>
+                <li><strong>Separate Window:</strong> zzTakeoff opens in its own window - move it to a second monitor</li>
                 <li><strong>Persistent Login:</strong> Stay logged in across sessions</li>
                 <li><strong>Full Web Access:</strong> Complete zzTakeoff functionality within the app</li>
                 <li><strong>Project Sync:</strong> The current project URL is captured for send operations</li>
-                <li><strong>Navigation:</strong> Use the address bar to navigate or click project links from Send History</li>
               </ul>
+
+              <h4>zzTakeoff Window Navigation:</h4>
+              <p>The zzTakeoff window has its own menu bar with helpful navigation options:</p>
+              <ul>
+                <li><strong>Navigation → Back to XLx Connector</strong> (<kbd>Ctrl+B</kbd>): Focus the main window (reopens if closed)</li>
+                <li><strong>Navigation → Reload Page</strong> (<kbd>Ctrl+R</kbd>): Refresh the current page</li>
+                <li><strong>Navigation → Go to Login:</strong> Navigate to zzTakeoff login page</li>
+                <li><strong>View → Zoom In/Out/Reset</strong> (<kbd>Ctrl++/-/0</kbd>): Adjust page zoom</li>
+                <li><strong>View → Toggle DevTools</strong> (<kbd>F12</kbd>): Open developer tools</li>
+              </ul>
+
+              <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>Tip:</strong> If you accidentally close the main XLx Connector window, use <kbd>Ctrl+B</kbd> in the zzTakeoff window to reopen it.
+              </div>
 
               <div class="alert alert-warning">
                 <i class="bi bi-exclamation-triangle me-2"></i>
@@ -285,6 +300,10 @@
                   <kbd>F12</kbd>
                   <span>Developer Tools</span>
                 </div>
+                <div class="shortcut-item">
+                  <kbd>Ctrl+B</kbd>
+                  <span>Back to XLx (from zzTakeoff window)</span>
+                </div>
               </div>
             </section>
 
@@ -373,7 +392,7 @@
               <div class="version-info mt-4">
                 <p class="text-muted">
                   <small>
-                    <strong>Version:</strong> 1.0.0<br>
+                    <strong>Version:</strong> 1.1.4<br>
                     <strong>Electron:</strong> {{ electronVersion }}<br>
                     <strong>Node:</strong> {{ nodeVersion }}
                   </small>

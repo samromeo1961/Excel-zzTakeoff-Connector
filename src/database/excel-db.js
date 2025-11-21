@@ -487,9 +487,49 @@ async function updateRow(excelFilePath, sheetName, rowId, updates) {
     db.run(updateSQL, values);
     // Save database after update
     saveDatabase(excelFilePath);
-    return true;
   } catch (err) {
     console.error('[ExcelDB] Update error:', err);
+    return false;
+  }
+}
+
+/**
+ * Bulk update rows in the database
+ * @param {string} excelFilePath - Path to the Excel file
+ * @param {string} sheetName - Name of the sheet
+ * @param {Array<{rowId: number, updates: Object}>} rowUpdates - Array of updates
+ * @returns {Promise<boolean>} Success status
+ */
+async function bulkUpdateRows(excelFilePath, sheetName, rowUpdates) {
+  if (!rowUpdates || rowUpdates.length === 0) return true;
+
+  const { db } = await getDatabase(excelFilePath);
+  const tableName = sanitizeTableName(sheetName);
+
+  db.run('BEGIN TRANSACTION');
+
+  try {
+    // Prepare statement for better performance if possible, but for dynamic columns we might need dynamic SQL
+    // For now, we'll just loop and execute
+    for (const { rowId, updates } of rowUpdates) {
+      const setClauses = Object.keys(updates).map(col => {
+        return `${sanitizeColumnName(col)} = ?`;
+      }).join(', ');
+
+      const values = Object.values(updates).map(v => v === null || v === undefined ? null : String(v));
+      values.push(rowId);
+
+      const updateSQL = `UPDATE ${tableName} SET ${setClauses} WHERE _id = ?`;
+      db.run(updateSQL, values);
+    }
+
+    db.run('COMMIT');
+    // Save database after update
+    saveDatabase(excelFilePath);
+    return true;
+  } catch (err) {
+    db.run('ROLLBACK');
+    console.error('[ExcelDB] Bulk update error:', err);
     return false;
   }
 }

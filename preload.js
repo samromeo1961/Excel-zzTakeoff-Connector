@@ -25,7 +25,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getSheetList: (filePath) => ipcRenderer.invoke('excel:get-sheet-list', filePath),
     closeFile: (filePath) => ipcRenderer.invoke('excel:close-file', filePath),
     rescanUnits: (filePath) => ipcRenderer.invoke('excel:rescan-units', filePath),
-    getFileStats: (filePath) => ipcRenderer.invoke('excel:get-file-stats', filePath)
+    getFileStats: (filePath) => ipcRenderer.invoke('excel:get-file-stats', filePath),
+    reapplyMappings: (filePath) => ipcRenderer.invoke('excel:reapply-mappings', filePath)
   },
 
   // External API calls (for zzTakeoff integration)
@@ -115,6 +116,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     findInPage: (text, options) => ipcRenderer.invoke('webview:find-in-page', text, options),
     stopFindInPage: (action) => ipcRenderer.invoke('webview:stop-find-in-page', action),
     executeJavaScript: (code) => ipcRenderer.invoke('webview:execute-javascript', code),
+    focusMainWindow: () => ipcRenderer.invoke('webview:focus-main-window'),
     // Event listeners for webview events
     onLoading: (callback) => ipcRenderer.on('webview:loading', (event, isLoading) => callback(isLoading)),
     onUrlChanged: (callback) => ipcRenderer.on('webview:url-changed', (event, url) => callback(url)),
